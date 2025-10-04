@@ -1,11 +1,18 @@
 {
-  "name": "@nearstack-dev/core",
+  "name": "@nearstack/core",
   "version": "0.0.1",
-  "description": "Web Development framework for full-stack apps in the web browser.",
-  "main": "index.js",
+  "description": "IndexedDB runtime, defineModel(), base Store interface",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Dakota Kim",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
 }

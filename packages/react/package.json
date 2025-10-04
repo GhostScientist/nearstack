@@ -1,0 +1,26 @@
+{
+  "name": "@nearstack/react",
+  "version": "0.0.1",
+  "description": "React bindings (useModel, useLiveQuery)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Dakota Kim",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": "^18.0.0"
+  },
+  "dependencies": {
+    "@nearstack/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.55",
+    "react": "^18.2.0",
+    "typescript": "^5.3.3"
+  }
+}

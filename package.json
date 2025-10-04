@@ -1,0 +1,22 @@
+{
+  "name": "nearstack",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Nearstack is a local-first full-stack web framework that makes the browser the backend. Built for offline-first AI apps.",
+  "author": "Dakota Kim",
+  "license": "MIT",
+  "scripts": {
+    "build": "pnpm --filter \"./packages/*\" run build",
+    "dev": "pnpm --filter \"./packages/*\" run dev --parallel",
+    "test": "pnpm --filter \"./packages/*\" run test",
+    "lint": "eslint packages/*/src --ext .ts,.tsx",
+    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,json}\""
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.3.3"
+  }
+}

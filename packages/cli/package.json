@@ -1,12 +1,22 @@
 {
-  "name": "cli",
+  "name": "@nearstack/cli",
   "version": "0.0.1",
-  "description": "",
-  "main": "index.js",
+  "description": "nearstack CLI that can scaffold a blank app",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "nearstack": "./dist/cli.js"
+  },
   "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "author": "Dakota Kim",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.19",
+    "typescript": "^5.3.3"
+  }
 }
