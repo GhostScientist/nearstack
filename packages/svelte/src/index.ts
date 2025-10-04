@@ -1,7 +1,7 @@
 // Svelte store adapter (simple bridge)
 
 import { writable, type Writable } from 'svelte/store';
-import type { Model } from '@nearstack/core';
+import type { Model } from '@nearstack-dev/core';
 
 export function modelStore<T = any>(
   model: Model<T>,

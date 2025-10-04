@@ -1,4 +1,4 @@
-import type { Model } from '@nearstack/core';
+import type { Model } from '@nearstack-dev/core';
 export declare function useModel<T = any>(model: Model<T>, id: string): {
     data: T | undefined;
     loading: boolean;

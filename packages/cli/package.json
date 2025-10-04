@@ -1,5 +1,5 @@
 {
-  "name": "@nearstack/cli",
+  "name": "@nearstack-dev/cli",
   "version": "0.0.1",
   "description": "nearstack CLI that can scaffold a blank app",
   "type": "module",

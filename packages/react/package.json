@@ -1,5 +1,5 @@
 {
-  "name": "@nearstack/react",
+  "name": "@nearstack-dev/react",
   "version": "0.0.1",
   "description": "React bindings (useModel, useLiveQuery)",
   "type": "module",
@@ -16,7 +16,7 @@
     "react": "^18.0.0"
   },
   "dependencies": {
-    "@nearstack/core": "workspace:*"
+    "@nearstack-dev/core": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.2.55",

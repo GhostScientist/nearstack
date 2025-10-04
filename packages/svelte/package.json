@@ -1,5 +1,5 @@
 {
-  "name": "@nearstack/svelte",
+  "name": "@nearstack-dev/svelte",
   "version": "0.0.1",
   "description": "Svelte store adapter (simple bridge)",
   "type": "module",
@@ -16,7 +16,7 @@
     "svelte": "^4.0.0"
   },
   "dependencies": {
-    "@nearstack/core": "workspace:*"
+    "@nearstack-dev/core": "workspace:*"
   },
   "devDependencies": {
     "svelte": "^4.2.10",

@@ -1,5 +1,5 @@
 {
-  "name": "@nearstack/rag",
+  "name": "@nearstack-dev/rag",
   "version": "0.0.1",
   "description": "Text splitter + embedding + vector search (stub)",
   "type": "module",
@@ -13,7 +13,7 @@
   "author": "Dakota Kim",
   "license": "MIT",
   "dependencies": {
-    "@nearstack/core": "workspace:*"
+    "@nearstack-dev/core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

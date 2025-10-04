@@ -1,5 +1,5 @@
 {
-  "name": "@nearstack/core",
+  "name": "@nearstack-dev/core",
   "version": "0.0.1",
   "description": "IndexedDB runtime, defineModel(), base Store interface",
   "type": "module",

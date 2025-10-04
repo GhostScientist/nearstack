@@ -1,5 +1,5 @@
 {
-  "name": "@nearstack/rtc",
+  "name": "@nearstack-dev/rtc",
   "version": "0.0.1",
   "description": "WebRTC + CRDT sync layer (stub for now)",
   "type": "module",
@@ -13,7 +13,7 @@
   "author": "Dakota Kim",
   "license": "MIT",
   "dependencies": {
-    "@nearstack/core": "workspace:*"
+    "@nearstack-dev/core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

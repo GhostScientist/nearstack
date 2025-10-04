@@ -1,7 +1,7 @@
 // React bindings (useModel, useLiveQuery)
 
 import { useState, useEffect } from 'react';
-import type { Model } from '@nearstack/core';
+import type { Model } from '@nearstack-dev/core';
 
 export function useModel<T = any>(model: Model<T>, id: string) {
   const [data, setData] = useState<T | undefined>(undefined);
