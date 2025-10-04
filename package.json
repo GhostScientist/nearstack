@@ -10,7 +10,15 @@
     "dev": "pnpm --filter \"./packages/*\" run dev --parallel",
     "test": "pnpm --filter \"./packages/*\" run test",
     "lint": "eslint packages/*/src --ext .ts,.tsx",
-    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,json}\""
+    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,json}\"",
+    "publish:all": "pnpm --filter \"./packages/*\" publish --access public",
+    "publish:core": "pnpm --filter @nearstack-dev/core publish",
+    "publish:react": "pnpm --filter @nearstack-dev/react publish",
+    "publish:svelte": "pnpm --filter @nearstack-dev/svelte publish",
+    "publish:rtc": "pnpm --filter @nearstack-dev/rtc publish",
+    "publish:rag": "pnpm --filter @nearstack-dev/rag publish",
+    "publish:ai": "pnpm --filter @nearstack-dev/ai publish",
+    "publish:cli": "pnpm --filter @nearstack-dev/cli publish"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^6.21.0",
