@@ -25,11 +25,92 @@ pnpm build
 pnpm dev
 ```
 
-## Usage
+## Quick Start
+
+Create a new Nearstack app in seconds:
 
 ```bash
-# Create a new Nearstack app
+# Using npx (recommended)
 npx @nearstack-dev/cli create my-app
+
+# Or install globally
+npm install -g @nearstack-dev/cli
+nearstack create my-app
+```
+
+Then follow the prompts to choose your UI framework (React or Svelte), and start developing:
+
+```bash
+cd my-app
+npm install
+npm run dev
+```
+
+Your app will be running at `http://localhost:5173` with:
+- ✅ **In-memory data persistence** using `@nearstack-dev/core`
+- ✅ **Todo model** pre-configured with full CRUD operations
+- ✅ **Working UI** with add, toggle, and delete functionality
+- ✅ **AI context** ready for WebLLM or custom adapters
+
+## What You Get
+
+Each scaffolded project includes:
+
+- **📦 packages/core integration** - `defineModel()` with `.table()` API for data management
+- **⚛️ Framework bindings** - `@nearstack-dev/react` or `@nearstack-dev/svelte`
+- **🤖 AI context** - Pre-configured `ai.context.ts` with FakeAdapter
+- **📝 Todo example** - Complete CRUD implementation in `src/models/Todo.ts`
+- **⚡ Vite setup** - Fast HMR and optimized build
+- **📘 TypeScript** - Full type safety out of the box
+
+## Core API
+
+### defineModel()
+
+```typescript
+import { defineModel } from '@nearstack-dev/core';
+
+interface Todo {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+const TodoModel = defineModel<Todo>('todos');
+
+// Use the table API
+const todos = TodoModel.table();
+
+// CRUD operations
+await todos.insert({ title: 'Learn Nearstack', completed: false });
+await todos.getAll();
+await todos.update('1', { completed: true });
+await todos.delete('1');
+await todos.find((todo) => !todo.completed);
+```
+
+### React Bindings
+
+```typescript
+import { useModel, useLiveQuery } from '@nearstack-dev/react';
+
+function TodoList() {
+  const { data, loading } = useLiveQuery(
+    async () => await TodoModel.table().getAll(),
+    []
+  );
+
+  // Your component logic
+}
+```
+
+### Svelte Bindings
+
+```typescript
+import { modelStore, liveQuery } from '@nearstack-dev/svelte';
+
+const todos = liveQuery(() => TodoModel.table().getAll());
+// Use $todos in your component
 ```
 
 ## Publishing to npm
