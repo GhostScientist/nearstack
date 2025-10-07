@@ -1,6 +1,6 @@
 {
   "name": "@nearstack-dev/svelte",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Svelte store adapter (simple bridge)",
   "type": "module",
   "main": "dist/index.js",

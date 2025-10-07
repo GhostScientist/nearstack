@@ -8,9 +8,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@nearstack-dev/core": "^0.0.2",
-    "@nearstack-dev/react": "^0.0.2",
-    "@nearstack-dev/ai": "^0.0.2",
+    "@nearstack-dev/core": "^0.0.3",
+    "@nearstack-dev/react": "^0.0.3",
+    "@nearstack-dev/ai": "^0.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

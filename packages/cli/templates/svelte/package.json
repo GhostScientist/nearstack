@@ -9,9 +9,9 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "@nearstack-dev/core": "^0.0.2",
-    "@nearstack-dev/svelte": "^0.0.2",
-    "@nearstack-dev/ai": "^0.0.2"
+    "@nearstack-dev/core": "^0.0.3",
+    "@nearstack-dev/svelte": "^0.0.3",
+    "@nearstack-dev/ai": "^0.0.3"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.0.0",
