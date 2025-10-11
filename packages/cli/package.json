@@ -1,6 +1,6 @@
 {
   "name": "@nearstack-dev/cli",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "nearstack CLI that can scaffold a blank app",
   "type": "module",
   "main": "dist/index.js",
