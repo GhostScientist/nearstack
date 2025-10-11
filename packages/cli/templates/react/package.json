@@ -8,11 +8,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@nearstack-dev/core": "^0.0.4",
-    "@nearstack-dev/react": "^0.0.4",
-    "@nearstack-dev/ai": "^0.0.4",
-    "@nearstack-dev/rag": "^0.0.4",
-    "@nearstack-dev/rtc": "^0.0.4",
+    "@nearstack-dev/core": "^0.0.5",
+    "@nearstack-dev/react": "^0.0.5",
+    "@nearstack-dev/ai": "^0.0.5",
+    "@nearstack-dev/rag": "^0.0.5",
+    "@nearstack-dev/rtc": "^0.0.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

@@ -11,13 +11,46 @@ export interface CRDTDocument {
   version: number;
 }
 
+export interface SyncEvent {
+  type: string;
+  data: any;
+}
+
+export interface SyncEngineConfig {
+  roomId: string;
+  onSync: (event: SyncEvent) => void;
+}
+
 export class SyncEngine {
   private peers: Map<string, SyncPeer> = new Map();
   private documents: Map<string, CRDTDocument> = new Map();
+  private connected = false;
+  private config: SyncEngineConfig;
 
-  async connect(peerId: string): Promise<void> {
+  constructor(config: SyncEngineConfig) {
+    this.config = config;
+  }
+
+  async connect(): Promise<void> {
     // Stub: Will implement WebRTC connection logic
-    console.log(`Connecting to peer: ${peerId}`);
+    console.log(`Connecting to room: ${this.config.roomId}`);
+    this.connected = true;
+  }
+
+  async disconnect(): Promise<void> {
+    // Stub: Will implement disconnect logic
+    console.log(`Disconnecting from room: ${this.config.roomId}`);
+    this.connected = false;
+  }
+
+  async broadcast(type: string, data: any): Promise<void> {
+    // Stub: Will implement broadcast logic
+    console.log(`Broadcasting ${type}:`, data);
+    
+    // Simulate receiving own message for demo
+    setTimeout(() => {
+      this.config.onSync({ type, data: `Remote: ${data}` });
+    }, 1000);
   }
 
   async sync(documentId: string): Promise<void> {
@@ -25,12 +58,11 @@ export class SyncEngine {
     console.log(`Syncing document: ${documentId}`);
   }
 
-  async disconnect(peerId: string): Promise<void> {
-    // Stub: Will implement disconnect logic
-    console.log(`Disconnecting from peer: ${peerId}`);
+  isConnected(): boolean {
+    return this.connected;
   }
 }
 
-export function createSyncEngine(): SyncEngine {
-  return new SyncEngine();
+export function createSyncEngine(config: SyncEngineConfig): SyncEngine {
+  return new SyncEngine(config);
 }
