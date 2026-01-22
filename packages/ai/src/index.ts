@@ -1,48 +1,87 @@
-// createAIContext() with Fake + WebLLM adapters
+// ═══════════════════════════════════════════════════════════════════════════
+// @nearstack-dev/ai - Browser-native local AI inference
+// ═══════════════════════════════════════════════════════════════════════════
 
-export interface Message {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Main AI Class and Factory
+// ─────────────────────────────────────────────────────────────────────────────
 
-export interface AIAdapter {
-  generate(messages: Message[]): Promise<string>;
-}
+export { AI, createAI } from './ai';
 
-export interface AIContext {
-  messages: Message[];
-  sendMessage(content: string): Promise<string>;
-  setAdapter(adapter: AIAdapter): void;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Singleton Instance
+// ─────────────────────────────────────────────────────────────────────────────
 
-export class FakeAdapter implements AIAdapter {
-  async generate(messages: Message[]): Promise<string> {
-    // Stub: Returns a fake response
-    return 'This is a fake AI response for testing purposes.';
-  }
-}
+import { AI } from './ai';
 
-export class WebLLMAdapter implements AIAdapter {
-  async generate(messages: Message[]): Promise<string> {
-    // Stub: Will implement WebLLM integration
-    throw new Error('WebLLM adapter not yet implemented');
-  }
-}
+/**
+ * Default singleton AI instance.
+ * Auto-detects available providers and initializes automatically.
+ *
+ * @example
+ * ```typescript
+ * import { ai } from '@nearstack-dev/ai';
+ *
+ * // Wait for initialization
+ * await ai.ready();
+ *
+ * // Simple chat
+ * const response = await ai.chat('Hello!');
+ * ```
+ */
+export const ai = new AI();
 
-export function createAIContext(adapter: AIAdapter = new FakeAdapter()): AIContext {
-  const messages: Message[] = [];
-  let currentAdapter = adapter;
+// ─────────────────────────────────────────────────────────────────────────────
+// Providers
+// ─────────────────────────────────────────────────────────────────────────────
 
-  return {
-    messages,
-    async sendMessage(content: string): Promise<string> {
-      messages.push({ role: 'user', content });
-      const response = await currentAdapter.generate(messages);
-      messages.push({ role: 'assistant', content: response });
-      return response;
-    },
-    setAdapter(adapter: AIAdapter): void {
-      currentAdapter = adapter;
-    },
-  };
-}
+export { BrowserProvider } from './providers/browser';
+export { OllamaProvider } from './providers/ollama';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Errors
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { AIError, AIErrorCode } from './errors';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type {
+  // Message types
+  Message,
+  ChatOptions,
+  StreamChunk,
+
+  // Model types
+  ModelInfo,
+  ModelStatus,
+
+  // Provider types
+  Provider,
+  ProviderType,
+  ProviderStatus,
+  BrowserProviderInterface,
+
+  // State types
+  AIState,
+  StateListener,
+  Unsubscribe,
+
+  // Configuration types
+  AIConfig,
+  BrowserProviderConfig,
+  OllamaProviderConfig,
+  OpenAICompatibleProviderConfig,
+
+  // UI helper types
+  ModelChoice,
+  ProviderChoice,
+} from './types';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Utilities (re-exported for convenience)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { formatBytes, getProviderLabel } from './utils';

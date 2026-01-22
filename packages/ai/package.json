@@ -1,10 +1,23 @@
 {
   "name": "@nearstack-dev/ai",
-  "version": "0.0.5",
-  "description": "createAIContext() with Fake + WebLLM adapters",
+  "version": "0.1.0",
+  "description": "Browser-native local AI inference library with WebLLM and Ollama support",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
   "files": [
     "dist"
   ],
@@ -12,17 +25,42 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm build"
   },
   "author": "Dakota Kim",
   "license": "MIT",
-  "dependencies": {
-    "@nearstack-dev/core": "workspace:*"
+  "dependencies": {},
+  "peerDependencies": {
+    "@mlc-ai/web-llm": ">=0.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@mlc-ai/web-llm": {
+      "optional": true
+    }
   },
   "devDependencies": {
-    "typescript": "^5.3.3"
-  }
+    "@mlc-ai/web-llm": "^0.2.80",
+    "@vitest/coverage-v8": "^1.6.0",
+    "fake-indexeddb": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.6.0"
+  },
+  "keywords": [
+    "ai",
+    "llm",
+    "webllm",
+    "ollama",
+    "browser",
+    "local",
+    "inference",
+    "webgpu",
+    "wasm"
+  ]
 }
