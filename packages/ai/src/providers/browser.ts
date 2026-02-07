@@ -407,7 +407,13 @@ export class BrowserProvider implements BrowserProviderInterface {
     }
 
     // Update localStorage to only include models that are actually cached
-    if (validIds.length !== storedIds.length) {
+    // Compare sets to detect any difference in model IDs
+    const storedIdSet = new Set(storedIds);
+    const validIdSet = new Set(validIds);
+    const hasChanges = storedIdSet.size !== validIdSet.size || 
+                       [...storedIdSet].some(id => !validIdSet.has(id));
+    
+    if (hasChanges) {
       this.syncCachedModelIds(validIds);
     }
   }
@@ -455,8 +461,10 @@ export class BrowserProvider implements BrowserProviderInterface {
       
       // Check if any cache name contains indicators of this model
       // WebLLM uses cache names like "webllm/model" or similar patterns
+      // Use word boundaries or path separators to avoid false positives
+      const modelIdPattern = new RegExp(`[/\\-_]${modelId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[/\\-_]|^${modelId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
       const hasModelCache = cacheNames.some(
-        (name) => name.includes("webllm") && name.includes(modelId)
+        (name) => name.includes("webllm") && modelIdPattern.test(name)
       );
       
       if (hasModelCache) {
@@ -464,16 +472,23 @@ export class BrowserProvider implements BrowserProviderInterface {
       }
 
       // Also check the main webllm cache for this model's files
-      for (const cacheName of cacheNames) {
-        if (cacheName.includes("webllm")) {
-          const cache = await window.caches.open(cacheName);
-          const requests = await cache.keys();
-          
-          // Check if any cached request URL contains this model ID
-          const hasModelFiles = requests.some((req) => req.url.includes(modelId));
-          if (hasModelFiles) {
-            return true;
-          }
+      // Check caches in order of likelihood to enable early termination
+      const webllmCaches = cacheNames.filter((name) => name.includes("webllm"));
+      
+      for (const cacheName of webllmCaches) {
+        const cache = await window.caches.open(cacheName);
+        const requests = await cache.keys();
+        
+        // Check if any cached request URL contains this model ID with proper boundaries
+        // WebLLM typically stores model files with paths containing the model ID
+        const hasModelFiles = requests.some((req) => {
+          const url = req.url;
+          // Look for the model ID in path segments to avoid false positives
+          return url.includes(`/${modelId}/`) || url.includes(`/${modelId}-`) || url.endsWith(`/${modelId}`);
+        });
+        
+        if (hasModelFiles) {
+          return true;
         }
       }
       
