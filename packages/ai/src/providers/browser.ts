@@ -116,7 +116,7 @@ export class BrowserProvider implements BrowserProviderInterface {
    */
   async initialize(): Promise<void> {
     // Check for cached models and update their status
-    this.checkCachedModels();
+    await this.checkCachedModels();
   }
 
   /**
@@ -388,13 +388,27 @@ export class BrowserProvider implements BrowserProviderInterface {
 
   /**
    * Check for cached models using localStorage.
+   * Validates against actual browser cache and evicts stale entries.
    */
-  private checkCachedModels(): void {
-    const ids = this.loadCachedModelIds();
-    for (const id of ids) {
+  private async checkCachedModels(): Promise<void> {
+    const storedIds = this.loadCachedModelIds();
+    const validIds: string[] = [];
+
+    for (const id of storedIds) {
       if (this.modelStatuses.has(id)) {
-        this.modelStatuses.set(id, { state: "cached" });
+        // Verify the model actually exists in browser cache
+        const isActuallyCached = await this.isModelInCache(id);
+        if (isActuallyCached) {
+          this.modelStatuses.set(id, { state: "cached" });
+          validIds.push(id);
+        }
+        // If not in cache, don't add to validIds (will be evicted)
       }
+    }
+
+    // Update localStorage to only include models that are actually cached
+    if (validIds.length !== storedIds.length) {
+      this.syncCachedModelIds(validIds);
     }
   }
 
@@ -425,6 +439,57 @@ export class BrowserProvider implements BrowserProviderInterface {
     ids.delete(modelId);
     try {
       localStorage.setItem(CACHED_MODELS_KEY, JSON.stringify([...ids]));
+    } catch {
+      // localStorage may be full or unavailable
+    }
+  }
+
+  /**
+   * Verify if a model exists in the browser cache.
+   * WebLLM stores models in the browser's Cache API with cache names
+   * that include "webllm" and potentially the model ID.
+   */
+  private async isModelInCache(modelId: string): Promise<boolean> {
+    try {
+      const cacheNames = await window.caches.keys();
+      
+      // Check if any cache name contains indicators of this model
+      // WebLLM uses cache names like "webllm/model" or similar patterns
+      const hasModelCache = cacheNames.some(
+        (name) => name.includes("webllm") && name.includes(modelId)
+      );
+      
+      if (hasModelCache) {
+        return true;
+      }
+
+      // Also check the main webllm cache for this model's files
+      for (const cacheName of cacheNames) {
+        if (cacheName.includes("webllm")) {
+          const cache = await window.caches.open(cacheName);
+          const requests = await cache.keys();
+          
+          // Check if any cached request URL contains this model ID
+          const hasModelFiles = requests.some((req) => req.url.includes(modelId));
+          if (hasModelFiles) {
+            return true;
+          }
+        }
+      }
+      
+      return false;
+    } catch {
+      // If we can't access the cache API, assume not cached
+      return false;
+    }
+  }
+
+  /**
+   * Sync localStorage with the provided list of valid cached model IDs.
+   */
+  private syncCachedModelIds(ids: string[]): void {
+    try {
+      localStorage.setItem(CACHED_MODELS_KEY, JSON.stringify(ids));
     } catch {
       // localStorage may be full or unavailable
     }
