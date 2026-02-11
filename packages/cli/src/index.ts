@@ -1,5 +1,3 @@
-// nearstack CLI that can scaffold a blank app
-
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,9 +6,10 @@ import { blue, cyan, green, red, yellow } from 'kolorist';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+type Framework = 'react' | 'sveltekit' | 'vue' | 'angular';
+
 interface PromptResult {
-  framework: 'react' | 'svelte';
-  includeAI: boolean;
+  framework: Framework;
   overwrite?: boolean;
 }
 
@@ -32,8 +31,8 @@ function copyDir(srcDir: string, destDir: string) {
   }
 }
 
-function isEmpty(path: string) {
-  const files = fs.readdirSync(path);
+function isEmpty(pathname: string) {
+  const files = fs.readdirSync(pathname);
   return files.length === 0 || (files.length === 1 && files[0] === '.git');
 }
 
@@ -57,37 +56,12 @@ function replaceInFile(filePath: string, replacements: Record<string, string>) {
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
-function stripAIFromReactTemplate(targetDir: string) {
-  const packagePath = path.join(targetDir, 'package.json');
-  const appPath = path.join(targetDir, 'src', 'App.tsx');
-  const chatComponentPath = path.join(targetDir, 'src', 'components', 'Chat.tsx');
-  const modelSetupComponentPath = path.join(targetDir, 'src', 'components', 'ModelSetup.tsx');
-
-  // Remove AI dependencies from package.json
-  if (fs.existsSync(packagePath)) {
-    const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
-    delete pkg.dependencies['@nearstack-dev/ai'];
-    delete pkg.dependencies['@mlc-ai/web-llm'];
-    fs.writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
-  }
-
-  // Remove AI component files
-  if (fs.existsSync(chatComponentPath)) {
-    fs.unlinkSync(chatComponentPath);
-  }
-  if (fs.existsSync(modelSetupComponentPath)) {
-    fs.unlinkSync(modelSetupComponentPath);
-  }
-
-  // Rewrite App.tsx to remove AI imports and usage
-  if (fs.existsSync(appPath)) {
-    fs.writeFileSync(
-      appPath,
-      `import { TodoList } from './components/TodoList';\nimport './App.css';\n\nfunction App() {\n  return (\n    <div className="layout">\n      <main>\n        <h1>Nearstack</h1>\n        <p>Local-first todos.</p>\n        <TodoList />\n      </main>\n    </div>\n  );\n}\n\nexport default App;\n`,
-      'utf-8'
-    );
-  }
-}
+export const FRAMEWORK_CHOICES: Array<{ title: string; value: Framework }> = [
+  { title: 'React', value: 'react' },
+  { title: 'SvelteKit', value: 'sveltekit' },
+  { title: 'Vue', value: 'vue' },
+  { title: 'Angular', value: 'angular' },
+];
 
 export async function scaffold(projectName: string): Promise<void> {
   const cwd = process.cwd();
@@ -114,22 +88,12 @@ export async function scaffold(projectName: string): Promise<void> {
       type: 'select',
       name: 'framework',
       message: 'Select a UI framework:',
-      choices: [
-        { title: 'React', value: 'react' },
-        { title: 'Svelte', value: 'svelte' },
-      ],
+      choices: FRAMEWORK_CHOICES,
       initial: 0,
-    },
-    {
-      type: (prev) => (prev === 'react' ? 'confirm' : null),
-      name: 'includeAI',
-      message: 'Include AI features?',
-      initial: true,
     },
   ]);
 
   const framework = answers.framework;
-  const includeAI = answers.includeAI ?? true;
 
   if (!framework) {
     console.log(red('✖') + ' Operation cancelled');
@@ -153,15 +117,12 @@ export async function scaffold(projectName: string): Promise<void> {
 
   copyDir(templateDir, targetDir);
 
-  if (framework === 'react' && !includeAI) {
-    stripAIFromReactTemplate(targetDir);
-  }
-
   const filesToReplace = [
     path.join(targetDir, 'package.json'),
     path.join(targetDir, 'index.html'),
     path.join(targetDir, 'public', 'manifest.json'),
     path.join(targetDir, 'vite.config.ts'),
+    path.join(targetDir, 'angular.json'),
   ];
 
   for (const file of filesToReplace) {
