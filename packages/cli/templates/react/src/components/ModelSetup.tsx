@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useModelSelector } from '@nearstack-dev/react';
+import { useModelSelector } from '@nearstack-dev/react/ai';
 
 export function ModelSetup() {
   const { choices, activeModel, selectModel, downloadModel, isDownloading, downloadProgress } =

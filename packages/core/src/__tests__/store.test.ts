@@ -27,45 +27,70 @@ function useInMemoryWindow() {
 describe('core store + model', () => {
   it('supports CRUD through table()', async () => {
     const restore = useInMemoryWindow();
-    const model = defineModel<Todo>('todos-test-crud');
-    const table = model.table();
+    try {
+      const model = defineModel<Todo>('todos-test-crud');
+      const table = model.table();
 
-    const created = await table.insert({ title: 'Write tests', completed: false });
-    expect(created.id).toBeTruthy();
+      const created = await table.insert({ title: 'Write tests', completed: false });
+      expect(created.id).toBeTruthy();
 
-    const fetched = await table.get(created.id);
-    expect(fetched?.title).toBe('Write tests');
+      const fetched = await table.get(created.id);
+      expect(fetched?.title).toBe('Write tests');
 
-    const updated = await table.update(created.id, { completed: true });
-    expect(updated?.completed).toBe(true);
+      const updated = await table.update(created.id, { completed: true });
+      expect(updated?.completed).toBe(true);
 
-    await table.delete(created.id);
-    expect(await table.get(created.id)).toBeUndefined();
-    restore();
+      await table.delete(created.id);
+      expect(await table.get(created.id)).toBeUndefined();
+    } finally {
+      restore();
+    }
   });
 
   it('fires change events after mutations', async () => {
     const restore = useInMemoryWindow();
-    const model = defineModel<Todo>('todos-test-events');
-    const callback = vi.fn();
-    const unsubscribe = model.subscribe(callback);
+    try {
+      const model = defineModel<Todo>('todos-test-events');
+      const callback = vi.fn();
+      const unsubscribe = model.subscribe(callback);
 
-    const row = await model.table().insert({ title: 'A', completed: false });
-    await model.table().update(row.id, { completed: true });
-    await model.table().delete(row.id);
+      const row = await model.table().insert({ title: 'A', completed: false });
+      await model.table().update(row.id, { completed: true });
+      await model.table().delete(row.id);
 
-    expect(callback).toHaveBeenCalledTimes(3);
-    unsubscribe();
-    restore();
+      expect(callback).toHaveBeenCalledTimes(3);
+      unsubscribe();
+    } finally {
+      restore();
+    }
   });
 
   it('falls back to in-memory store when indexeddb is unavailable', async () => {
     const restore = useInMemoryWindow();
+    try {
+      const model = defineModel<Todo>('todos-memory');
+      const inserted = await model.table().insert({ title: 'offline', completed: false });
 
-    const model = defineModel<Todo>('todos-memory');
-    const inserted = await model.table().insert({ title: 'offline', completed: false });
+      expect((await model.table().getAll()).map((item) => item.id)).toContain(inserted.id);
+    } finally {
+      restore();
+    }
+  });
 
-    expect((await model.table().getAll()).map((item) => item.id)).toContain(inserted.id);
-    restore();
+  it('fires change events with indexeddb store', async () => {
+    // This test runs with IndexedDB available (fake-indexeddb/auto is imported)
+    const model = defineModel<Todo>('todos-indexeddb-events');
+    const callback = vi.fn();
+    const unsubscribe = model.subscribe(callback);
+
+    try {
+      const row = await model.table().insert({ title: 'IndexedDB test', completed: false });
+      await model.table().update(row.id, { completed: true });
+      await model.table().delete(row.id);
+
+      expect(callback).toHaveBeenCalledTimes(3);
+    } finally {
+      unsubscribe();
+    }
   });
 });

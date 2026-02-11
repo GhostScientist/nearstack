@@ -8,16 +8,26 @@ export function useLiveQuery<T = any>(
 ) {
   const [data, setData] = useState<T | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
     const runQuery = async () => {
       setLoading(true);
-      const value = await query();
-      if (!mounted) return;
-      setData(value);
-      setLoading(false);
+      setError(null);
+      try {
+        const value = await query();
+        if (!mounted) return;
+        setData(value);
+      } catch (err) {
+        if (!mounted) return;
+        setError(err instanceof Error ? err : new Error(String(err)));
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
     };
 
     void runQuery();
@@ -32,5 +42,5 @@ export function useLiveQuery<T = any>(
     };
   }, [model, ...deps]);
 
-  return { data, loading };
+  return { data, loading, error };
 }

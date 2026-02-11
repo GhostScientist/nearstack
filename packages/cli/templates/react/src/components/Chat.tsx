@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useChat } from '@nearstack-dev/react';
+import { useChat } from '@nearstack-dev/react/ai';
 
 export function Chat() {
   const [input, setInput] = useState('');
