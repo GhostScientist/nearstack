@@ -1,5 +1,9 @@
 // IndexedDB runtime, defineModel(), base Store interface
 
+import type { BaseProvider, Message, StateListener, Unsubscribe } from './types.js';
+
+export type { Message, BaseProvider, StateListener, Unsubscribe } from './types.js';
+
 export interface Store<T = any> {
   get(id: string): Promise<T | undefined>;
   set(id: string, value: T): Promise<void>;
@@ -22,26 +26,24 @@ export interface Model<T = any> {
   name: string;
   store: Store<T>;
   table(): Table<T>;
+  subscribe(callback: StateListener): Unsubscribe;
 }
 
-// IndexedDB storage implementation with in-memory fallback
 class IndexedDBStore<T extends { id: string }> implements Store<T> {
-  private dbName: string;
-  private storeName: string;
   private db: IDBDatabase | null = null;
   private fallbackStore?: InMemoryStore<T>;
   private isInitialized = false;
 
-  constructor(dbName: string, storeName: string) {
-    this.dbName = dbName;
-    this.storeName = storeName;
-  }
+  constructor(
+    private dbName: string,
+    private storeName: string,
+    private notifyChange: () => void
+  ) {}
 
   private async init(): Promise<void> {
     if (this.isInitialized) return;
 
     try {
-      // Check if IndexedDB is available
       if (typeof window === 'undefined' || !window.indexedDB) {
         throw new Error('IndexedDB not available');
       }
@@ -50,7 +52,7 @@ class IndexedDBStore<T extends { id: string }> implements Store<T> {
       this.isInitialized = true;
     } catch (error) {
       console.warn('IndexedDB unavailable, falling back to in-memory storage:', error);
-      this.fallbackStore = new InMemoryStore<T>();
+      this.fallbackStore = new InMemoryStore<T>(this.notifyChange);
       this.isInitialized = true;
     }
   }
@@ -80,7 +82,7 @@ class IndexedDBStore<T extends { id: string }> implements Store<T> {
 
   async get(id: string): Promise<T | undefined> {
     await this.init();
-    
+
     if (this.fallbackStore) {
       return this.fallbackStore.get(id);
     }
@@ -95,37 +97,43 @@ class IndexedDBStore<T extends { id: string }> implements Store<T> {
 
   async set(id: string, value: T): Promise<void> {
     await this.init();
-    
+
     if (this.fallbackStore) {
-      return this.fallbackStore.set(id, value);
+      await this.fallbackStore.set(id, value);
+      return;
     }
 
     const store = await this.getObjectStore('readwrite');
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const request = store.put(value);
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve();
     });
+
+    this.notifyChange();
   }
 
   async delete(id: string): Promise<void> {
     await this.init();
-    
+
     if (this.fallbackStore) {
-      return this.fallbackStore.delete(id);
+      await this.fallbackStore.delete(id);
+      return;
     }
 
     const store = await this.getObjectStore('readwrite');
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const request = store.delete(id);
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve();
     });
+
+    this.notifyChange();
   }
 
   async getAll(): Promise<T[]> {
     await this.init();
-    
+
     if (this.fallbackStore) {
       return this.fallbackStore.getAll();
     }
@@ -140,12 +148,11 @@ class IndexedDBStore<T extends { id: string }> implements Store<T> {
 
   async insert(value: Omit<T, 'id'>): Promise<T> {
     await this.init();
-    
+
     if (this.fallbackStore) {
       return this.fallbackStore.insert(value);
     }
 
-    // Generate a UUID for the ID
     const id = crypto.randomUUID();
     const item = { ...value, id } as T;
     await this.set(id, item);
@@ -154,7 +161,7 @@ class IndexedDBStore<T extends { id: string }> implements Store<T> {
 
   async update(id: string, value: Partial<T>): Promise<T | undefined> {
     await this.init();
-    
+
     if (this.fallbackStore) {
       return this.fallbackStore.update(id, value);
     }
@@ -167,9 +174,10 @@ class IndexedDBStore<T extends { id: string }> implements Store<T> {
   }
 }
 
-// In-memory storage implementation (fallback)
 class InMemoryStore<T extends { id: string }> implements Store<T> {
   private data: Map<string, T> = new Map();
+
+  constructor(private notifyChange: () => void) {}
 
   async get(id: string): Promise<T | undefined> {
     return this.data.get(id);
@@ -177,10 +185,12 @@ class InMemoryStore<T extends { id: string }> implements Store<T> {
 
   async set(id: string, value: T): Promise<void> {
     this.data.set(id, value);
+    this.notifyChange();
   }
 
   async delete(id: string): Promise<void> {
     this.data.delete(id);
+    this.notifyChange();
   }
 
   async getAll(): Promise<T[]> {
@@ -233,13 +243,21 @@ class TableImpl<T extends { id: string }> implements Table<T> {
 }
 
 export function defineModel<T extends { id: string }>(name: string): Model<T> {
-  const store = new IndexedDBStore<T>('nearstack', name);
+  const listeners = new Set<StateListener>();
+  const notify = () => {
+    for (const callback of listeners) callback();
+  };
+  const store = new IndexedDBStore<T>('nearstack', name, notify);
 
   return {
     name,
     store,
     table() {
       return new TableImpl(store);
+    },
+    subscribe(callback: StateListener): Unsubscribe {
+      listeners.add(callback);
+      return () => listeners.delete(callback);
     },
   };
 }

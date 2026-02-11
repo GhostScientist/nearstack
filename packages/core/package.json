@@ -1,6 +1,6 @@
 {
   "name": "@nearstack-dev/core",
-  "version": "0.0.5",
+  "version": "0.1.0",
   "description": "IndexedDB runtime, defineModel(), base Store interface",
   "type": "module",
   "main": "dist/index.js",
@@ -14,12 +14,14 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "prepublishOnly": "pnpm build"
   },
   "author": "Dakota Kim",
   "license": "MIT",
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "fake-indexeddb": "^6.0.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.6.0"
   }
 }
