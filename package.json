@@ -1,6 +1,6 @@
 {
   "name": "nearstack",
-  "version": "0.0.5",
+  "version": "0.1.1",
   "private": true,
   "description": "Nearstack is a local-first full-stack web framework that makes the browser the backend. Built for offline-first AI apps.",
   "author": "Dakota Kim",
