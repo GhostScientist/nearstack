@@ -10,6 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 interface PromptResult {
   framework: 'react' | 'svelte';
+  includeAI: boolean;
   overwrite?: boolean;
 }
 
@@ -56,11 +57,42 @@ function replaceInFile(filePath: string, replacements: Record<string, string>) {
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
+function stripAIFromReactTemplate(targetDir: string) {
+  const packagePath = path.join(targetDir, 'package.json');
+  const appPath = path.join(targetDir, 'src', 'App.tsx');
+  const chatComponentPath = path.join(targetDir, 'src', 'components', 'Chat.tsx');
+  const modelSetupComponentPath = path.join(targetDir, 'src', 'components', 'ModelSetup.tsx');
+
+  // Remove AI dependencies from package.json
+  if (fs.existsSync(packagePath)) {
+    const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
+    delete pkg.dependencies['@nearstack-dev/ai'];
+    delete pkg.dependencies['@mlc-ai/web-llm'];
+    fs.writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
+  }
+
+  // Remove AI component files
+  if (fs.existsSync(chatComponentPath)) {
+    fs.unlinkSync(chatComponentPath);
+  }
+  if (fs.existsSync(modelSetupComponentPath)) {
+    fs.unlinkSync(modelSetupComponentPath);
+  }
+
+  // Rewrite App.tsx to remove AI imports and usage
+  if (fs.existsSync(appPath)) {
+    fs.writeFileSync(
+      appPath,
+      `import { TodoList } from './components/TodoList';\nimport './App.css';\n\nfunction App() {\n  return (\n    <div className="layout">\n      <main>\n        <h1>Nearstack</h1>\n        <p>Local-first todos.</p>\n        <TodoList />\n      </main>\n    </div>\n  );\n}\n\nexport default App;\n`,
+      'utf-8'
+    );
+  }
+}
+
 export async function scaffold(projectName: string): Promise<void> {
   const cwd = process.cwd();
   const targetDir = path.join(cwd, projectName);
 
-  // Check if directory exists
   if (fs.existsSync(targetDir) && !isEmpty(targetDir)) {
     const { overwrite }: { overwrite?: boolean } = await prompts({
       type: 'confirm',
@@ -77,17 +109,27 @@ export async function scaffold(projectName: string): Promise<void> {
     emptyDir(targetDir);
   }
 
-  // Prompt for framework choice
-  const { framework }: PromptResult = await prompts({
-    type: 'select',
-    name: 'framework',
-    message: 'Select a UI framework:',
-    choices: [
-      { title: 'React', value: 'react' },
-      { title: 'Svelte', value: 'svelte' },
-    ],
-    initial: 0,
-  });
+  const answers: PromptResult = await prompts([
+    {
+      type: 'select',
+      name: 'framework',
+      message: 'Select a UI framework:',
+      choices: [
+        { title: 'React', value: 'react' },
+        { title: 'Svelte', value: 'svelte' },
+      ],
+      initial: 0,
+    },
+    {
+      type: (prev) => (prev === 'react' ? 'confirm' : null),
+      name: 'includeAI',
+      message: 'Include AI features?',
+      initial: true,
+    },
+  ]);
+
+  const framework = answers.framework;
+  const includeAI = answers.includeAI ?? true;
 
   if (!framework) {
     console.log(red('✖') + ' Operation cancelled');
@@ -98,7 +140,6 @@ export async function scaffold(projectName: string): Promise<void> {
   console.log(`Scaffolding Nearstack project in ${cyan(targetDir)}...`);
   console.log();
 
-  // Get template directory
   const templateDir = path.join(__dirname, '..', 'templates', framework);
 
   if (!fs.existsSync(templateDir)) {
@@ -106,18 +147,21 @@ export async function scaffold(projectName: string): Promise<void> {
     process.exit(1);
   }
 
-  // Create target directory
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });
   }
 
-  // Copy template files
   copyDir(templateDir, targetDir);
 
-  // Replace project name in files
+  if (framework === 'react' && !includeAI) {
+    stripAIFromReactTemplate(targetDir);
+  }
+
   const filesToReplace = [
     path.join(targetDir, 'package.json'),
     path.join(targetDir, 'index.html'),
+    path.join(targetDir, 'public', 'manifest.json'),
+    path.join(targetDir, 'vite.config.ts'),
   ];
 
   for (const file of filesToReplace) {
