@@ -8,18 +8,25 @@ export function useAI(instance: AI = defaultAI) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     const unsubscribe = instance.subscribe((nextState) => {
+      if (!mounted) return;
       setState(nextState);
       setIsLoading(!nextState.initialized);
       setError(nextState.error);
     });
 
     instance.ready().catch((readyError) => {
+      if (!mounted) return;
       setError(readyError instanceof Error ? readyError.message : String(readyError));
       setIsLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, [instance]);
 
   return {

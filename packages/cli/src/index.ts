@@ -60,7 +60,10 @@ function replaceInFile(filePath: string, replacements: Record<string, string>) {
 function stripAIFromReactTemplate(targetDir: string) {
   const packagePath = path.join(targetDir, 'package.json');
   const appPath = path.join(targetDir, 'src', 'App.tsx');
+  const chatComponentPath = path.join(targetDir, 'src', 'components', 'Chat.tsx');
+  const modelSetupComponentPath = path.join(targetDir, 'src', 'components', 'ModelSetup.tsx');
 
+  // Remove AI dependencies from package.json
   if (fs.existsSync(packagePath)) {
     const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
     delete pkg.dependencies['@nearstack-dev/ai'];
@@ -68,6 +71,15 @@ function stripAIFromReactTemplate(targetDir: string) {
     fs.writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
   }
 
+  // Remove AI component files
+  if (fs.existsSync(chatComponentPath)) {
+    fs.unlinkSync(chatComponentPath);
+  }
+  if (fs.existsSync(modelSetupComponentPath)) {
+    fs.unlinkSync(modelSetupComponentPath);
+  }
+
+  // Rewrite App.tsx to remove AI imports and usage
   if (fs.existsSync(appPath)) {
     fs.writeFileSync(
       appPath,
