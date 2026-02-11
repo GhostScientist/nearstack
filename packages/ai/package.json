@@ -1,6 +1,6 @@
 {
   "name": "@nearstack-dev/ai",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Browser-native local AI inference library with WebLLM and Ollama support",
   "type": "module",
   "main": "dist/index.cjs",

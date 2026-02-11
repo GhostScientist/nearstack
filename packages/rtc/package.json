@@ -1,6 +1,6 @@
 {
   "name": "@nearstack-dev/rtc",
-  "version": "0.0.5",
+  "version": "0.1.1",
   "description": "WebRTC + CRDT sync layer (stub for now)",
   "type": "module",
   "main": "dist/index.js",
