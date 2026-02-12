@@ -29,6 +29,85 @@ export interface Model<T = any> {
   subscribe(callback: StateListener): Unsubscribe;
 }
 
+// ─── Shared DB connection manager ──────────────────────────────────
+// Tracks all registered store names per database and shares a single
+// connection, upgrading the schema when new stores are discovered.
+// All defineModel() calls must happen at module import time (before
+// any store operations) so that every store is registered before the
+// shared connection is opened.
+
+const _dbStoreNames = new Map<string, Set<string>>();
+const _dbConnections = new Map<string, Promise<IDBDatabase>>();
+
+function registerStoreName(dbName: string, storeName: string): void {
+  let stores = _dbStoreNames.get(dbName);
+  if (!stores) {
+    stores = new Set();
+    _dbStoreNames.set(dbName, stores);
+  }
+  stores.add(storeName);
+  // Invalidate cached connection so the next access checks for missing stores
+  _dbConnections.delete(dbName);
+}
+
+function getDatabase(dbName: string): Promise<IDBDatabase> {
+  const cached = _dbConnections.get(dbName);
+  if (cached) return cached;
+
+  const promise = openOrUpgrade(dbName);
+  _dbConnections.set(dbName, promise);
+  return promise;
+}
+
+function openOrUpgrade(dbName: string): Promise<IDBDatabase> {
+  const neededStores = _dbStoreNames.get(dbName) ?? new Set<string>();
+
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    // Open without an explicit version to discover the current state
+    const probeReq = indexedDB.open(dbName);
+
+    probeReq.onerror = () => reject(probeReq.error);
+
+    probeReq.onsuccess = () => {
+      const db = probeReq.result;
+      const missing = [...neededStores].filter(
+        (s) => !db.objectStoreNames.contains(s)
+      );
+
+      if (missing.length === 0) {
+        resolve(db);
+        return;
+      }
+
+      // Upgrade needed — bump version and create missing stores
+      const newVersion = db.version + 1;
+      db.close();
+
+      const upgradeReq = indexedDB.open(dbName, newVersion);
+      upgradeReq.onerror = () => reject(upgradeReq.error);
+      upgradeReq.onsuccess = () => resolve(upgradeReq.result);
+      upgradeReq.onupgradeneeded = (event) => {
+        const udb = (event.target as IDBOpenDBRequest).result;
+        for (const store of neededStores) {
+          if (!udb.objectStoreNames.contains(store)) {
+            udb.createObjectStore(store, { keyPath: 'id' });
+          }
+        }
+      };
+    };
+
+    // DB doesn't exist yet — create fresh with all registered stores
+    probeReq.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      for (const store of neededStores) {
+        if (!db.objectStoreNames.contains(store)) {
+          db.createObjectStore(store, { keyPath: 'id' });
+        }
+      }
+    };
+  });
+}
+
 class IndexedDBStore<T extends { id: string }> implements Store<T> {
   private db: IDBDatabase | null = null;
   private fallbackStore?: InMemoryStore<T>;
@@ -38,7 +117,9 @@ class IndexedDBStore<T extends { id: string }> implements Store<T> {
     private dbName: string,
     private storeName: string,
     private notifyChange: () => void
-  ) {}
+  ) {
+    registerStoreName(dbName, storeName);
+  }
 
   private async init(): Promise<void> {
     if (this.isInitialized) return;
@@ -48,29 +129,13 @@ class IndexedDBStore<T extends { id: string }> implements Store<T> {
         throw new Error('IndexedDB not available');
       }
 
-      this.db = await this.openDB();
+      this.db = await getDatabase(this.dbName);
       this.isInitialized = true;
     } catch (error) {
       console.warn('IndexedDB unavailable, falling back to in-memory storage:', error);
       this.fallbackStore = new InMemoryStore<T>(this.notifyChange);
       this.isInitialized = true;
     }
-  }
-
-  private openDB(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, 1);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        if (!db.objectStoreNames.contains(this.storeName)) {
-          db.createObjectStore(this.storeName, { keyPath: 'id' });
-        }
-      };
-    });
   }
 
   private async getObjectStore(mode: IDBTransactionMode = 'readonly'): Promise<IDBObjectStore> {
