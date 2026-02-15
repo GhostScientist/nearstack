@@ -11,11 +11,11 @@ export default defineConfig({
       manifest: {
         name: '{{PROJECT_NAME}}',
         short_name: '{{PROJECT_NAME}}',
-        description: 'Nearstack local-first todo + AI chat app',
+        description: 'A local-first notes app powered by Nearstack',
         start_url: '/',
         display: 'standalone',
-        background_color: '#0f1115',
-        theme_color: '#0f1115',
+        background_color: '#ffffff',
+        theme_color: '#ffffff',
         icons: [
           { src: '/nearstack-icon-192.svg', sizes: '192x192', type: 'image/svg+xml' },
           { src: '/nearstack-icon-512.svg', sizes: '512x512', type: 'image/svg+xml' }

@@ -1,161 +1,144 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { AI, type Message, type ModelInfo } from '@nearstack-dev/ai';
-  import { TodoModel, type Todo } from '$lib/models/Todo';
+  import { AI } from '@nearstack-dev/ai';
+  import { NoteModel, type Note } from '$lib/models/Note';
+  import Sidebar from '$lib/components/Sidebar.svelte';
+  import NoteEditor from '$lib/components/NoteEditor.svelte';
+  import AIPanel from '$lib/components/AIPanel.svelte';
 
   const ai = new AI();
-  let todos: Todo[] = [];
-  let todoTitle = '';
-  let models: ModelInfo[] = [];
-  let selectedModel = '';
-  let isDownloading = false;
-  let downloadProgress = 0;
-  let messages: Message[] = [];
-  let chatInput = '';
-  let isSending = false;
-  let error = '';
+  let notes: Note[] = [];
+  let activeNoteId: string | null = null;
+  let search = '';
+  let showAI = false;
 
-  function buildSystemPrompt(items: Todo[]): string | undefined {
-    if (!items.length) return undefined;
-    const pending = items.filter((todo) => !todo.completed).map((todo) => `- ${todo.title}`).join('\n');
-    const complete = items.filter((todo) => todo.completed).map((todo) => `- ${todo.title}`).join('\n');
-    return ['You are a helpful assistant with access to local todos.', pending ? `Pending todos:\n${pending}` : '', complete ? `Completed todos:\n${complete}` : '']
-      .filter(Boolean)
-      .join('\n\n');
+  $: filteredNotes = notes
+    .filter(note => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        note.title.toLowerCase().includes(q) ||
+        note.content.toLowerCase().includes(q) ||
+        note.tags.some(t => t.toLowerCase().includes(q))
+      );
+    })
+    .sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      return b.updatedAt - a.updatedAt;
+    });
+
+  $: activeNote = notes.find(n => n.id === activeNoteId) ?? null;
+  $: allTags = [...new Set(notes.flatMap(n => n.tags))];
+
+  async function refreshNotes() {
+    notes = await NoteModel.table().getAll();
   }
 
-  async function refreshTodos() {
-    todos = await TodoModel.table().getAll();
+  async function createNote() {
+    const note = await NoteModel.table().insert({
+      title: '',
+      content: '',
+      tags: [],
+      pinned: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    activeNoteId = note.id;
+    await refreshNotes();
   }
 
-  async function addTodo(event: SubmitEvent) {
-    event.preventDefault();
-    if (!todoTitle.trim()) return;
-    await TodoModel.table().insert({ title: todoTitle.trim(), completed: false, createdAt: Date.now() });
-    todoTitle = '';
-    await refreshTodos();
+  function handleExport() {
+    const blob = new Blob([JSON.stringify(notes, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'nearstack-notes.json';
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
-  async function toggle(todo: Todo) {
-    await TodoModel.table().update(todo.id, { completed: !todo.completed });
-    await refreshTodos();
-  }
-
-  async function remove(id: string) {
-    await TodoModel.table().delete(id);
-    await refreshTodos();
-  }
-
-  async function selectModel(modelId: string) {
-    selectedModel = modelId;
-    const model = models.find((entry) => entry.id === modelId);
-    if (!model) return;
-
-    if (model.status.state === 'available') {
-      isDownloading = true;
-      downloadProgress = 0;
-      const unsubscribe = ai.subscribe((state) => {
-        if (state.downloading?.modelId === modelId) {
-          downloadProgress = state.downloading.progress;
-        }
-      });
-      try {
-        await ai.models.download(modelId);
-      } finally {
-        unsubscribe();
-        isDownloading = false;
+  function handleImport() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      const imported = JSON.parse(text) as Note[];
+      for (const note of imported) {
+        const { id, ...data } = note;
+        await NoteModel.table().insert(data);
       }
-    }
-
-    await ai.models.use(modelId);
-    models = ai.models.list();
-  }
-
-  async function sendMessage(event: SubmitEvent) {
-    event.preventDefault();
-    const text = chatInput.trim();
-    if (!text || !selectedModel) return;
-    chatInput = '';
-    error = '';
-    const next = [...messages, { role: 'user', content: text } as Message];
-    messages = next;
-    isSending = true;
-
-    try {
-      const reply = await ai.chat(next, { systemPrompt: buildSystemPrompt(todos) });
-      messages = [...next, { role: 'assistant', content: reply }];
-    } catch (chatError) {
-      error = chatError instanceof Error ? chatError.message : 'Chat failed';
-    } finally {
-      isSending = false;
-    }
+      await refreshNotes();
+    };
+    input.click();
   }
 
   onMount(async () => {
-    await refreshTodos();
+    await refreshNotes();
+    NoteModel.subscribe(() => void refreshNotes());
     await ai.ready();
-    models = ai.models.list();
-    const active = ai.models.active();
-    selectedModel = active?.id ?? '';
   });
 </script>
 
-<div class="mx-auto grid min-h-screen max-w-7xl gap-6 p-6 lg:grid-cols-[2fr_1fr]">
-  <main class="space-y-4">
-    <h1 class="text-4xl font-bold tracking-tight">Nearstack + SvelteKit</h1>
-    <section class="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
-      <h2 class="text-xl font-semibold">Todos</h2>
-      <form class="mt-3 flex gap-2" on:submit={addTodo}>
-        <input class="flex-1 rounded-md border border-slate-700 bg-slate-950 px-3 py-2" bind:value={todoTitle} placeholder="Add a task" />
-        <button class="rounded-md bg-cyan-500 px-4 py-2 font-medium text-slate-950" type="submit">Add</button>
-      </form>
-      <ul class="mt-4 space-y-2">
-        {#each todos as todo (todo.id)}
-          <li class="flex items-center justify-between rounded-md border border-slate-700 p-2">
-            <label class="flex items-center gap-3">
-              <input type="checkbox" checked={todo.completed} on:change={() => toggle(todo)} />
-              <span class:line-through={todo.completed} class:opacity-50={todo.completed}>{todo.title}</span>
-            </label>
-            <button class="text-sm text-rose-300" on:click={() => remove(todo.id)}>Delete</button>
-          </li>
-        {/each}
-      </ul>
-    </section>
-  </main>
+<div class="flex h-screen flex-col bg-white text-black">
+  <header class="flex items-center justify-between border-b border-neutral-200 px-6 py-3">
+    <div class="flex items-center gap-3">
+      <div class="h-3.5 w-3.5 bg-black"></div>
+      <h1 class="text-base font-semibold tracking-tight">Nearstack Notes</h1>
+    </div>
+    <div class="flex items-center gap-1.5">
+      <button
+        on:click={() => (showAI = !showAI)}
+        class="px-3 py-1.5 text-sm font-medium transition-colors {showAI ? 'bg-black text-white' : 'border border-neutral-300 hover:bg-neutral-100'}"
+      >
+        AI Assistant
+      </button>
+      <button on:click={handleExport} class="border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100">
+        Export
+      </button>
+      <button on:click={handleImport} class="border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100">
+        Import
+      </button>
+    </div>
+  </header>
 
-  <aside class="space-y-4">
-    <section class="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
-      <h2 class="text-xl font-semibold">Model Setup</h2>
-      <select class="mt-3 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2" bind:value={selectedModel} on:change={(event) => selectModel((event.target as HTMLSelectElement).value)}>
-        <option value="">Select a model</option>
-        {#each models as model (model.id)}
-          <option value={model.id}>{model.provider} · {model.name}</option>
-        {/each}
-      </select>
-      {#if isDownloading}
-        <p class="mt-3 text-sm text-slate-300">Downloading {Math.round(downloadProgress * 100)}%</p>
-      {/if}
-    </section>
+  <div class="flex flex-1 overflow-hidden">
+    <Sidebar
+      notes={filteredNotes}
+      {activeNoteId}
+      {search}
+      on:search={e => (search = e.detail)}
+      on:select={e => (activeNoteId = e.detail)}
+      on:create={createNote}
+    />
 
-    <section class="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
-      <h2 class="text-xl font-semibold">AI Chat</h2>
-      <div class="mt-3 h-80 space-y-2 overflow-y-auto rounded-md border border-slate-700 bg-slate-950 p-2">
-        {#if messages.length === 0}
-          <p class="text-sm text-slate-400">Ask AI about your todos.</p>
-        {/if}
-        {#each messages as message, index (`${message.role}-${index}`)}
-          <div class={`max-w-[90%] rounded-md px-3 py-2 text-sm ${message.role === 'assistant' ? 'bg-slate-800' : 'ml-auto bg-cyan-500 text-slate-950'}`}>
-            {message.content}
+    <main class="flex flex-1 flex-col overflow-hidden">
+      {#if activeNote}
+        <NoteEditor note={activeNote} />
+      {:else}
+        <div class="flex flex-1 items-center justify-center">
+          <div class="text-center text-neutral-400">
+            <p class="text-lg font-light">Select a note or create a new one</p>
+            <button on:click={createNote} class="mt-4 bg-black px-4 py-2 text-sm text-white hover:bg-neutral-800">
+              New Note
+            </button>
           </div>
-        {/each}
-      </div>
-      {#if error}
-        <p class="mt-2 text-sm text-rose-300">{error}</p>
+        </div>
       {/if}
-      <form class="mt-3 flex gap-2" on:submit={sendMessage}>
-        <input class="flex-1 rounded-md border border-slate-700 bg-slate-950 px-3 py-2" bind:value={chatInput} placeholder="Ask about your todos..." />
-        <button class="rounded-md bg-cyan-500 px-4 py-2 font-medium text-slate-950" disabled={isSending || !selectedModel} type="submit">Send</button>
-      </form>
-    </section>
-  </aside>
+    </main>
+
+    {#if showAI}
+      <aside class="w-96 border-l border-neutral-200">
+        <AIPanel {notes} {ai} />
+      </aside>
+    {/if}
+  </div>
+
+  <footer class="border-t border-neutral-200 px-6 py-2 text-[11px] text-neutral-400">
+    {notes.length} {notes.length === 1 ? 'note' : 'notes'} &middot;
+    {allTags.length} {allTags.length === 1 ? 'tag' : 'tags'} &middot;
+    Stored locally in your browser
+  </footer>
 </div>

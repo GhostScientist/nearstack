@@ -96,13 +96,12 @@
     max-width: 600px;
     margin: 0 auto;
     padding: 2rem;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-      Ubuntu, Cantarell, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   }
 
   h1 {
     margin: 0 0 0.5rem;
-    color: #333;
+    color: #000;
   }
 
   .subtitle {
@@ -121,27 +120,25 @@
     flex: 1;
     padding: 0.75rem;
     font-size: 1rem;
-    border: 2px solid #e0e0e0;
-    border-radius: 4px;
+    border: 1px solid #d4d4d4;
   }
 
   .todo-input:focus {
     outline: none;
-    border-color: #4a90e2;
+    border-color: #000;
   }
 
   .add-button {
     padding: 0.75rem 1.5rem;
     font-size: 1rem;
-    background: #4a90e2;
-    color: white;
+    background: #000;
+    color: #fff;
     border: none;
-    border-radius: 4px;
     cursor: pointer;
   }
 
   .add-button:hover {
-    background: #357abd;
+    background: #333;
   }
 
   .todo-list {
@@ -159,20 +156,22 @@
     align-items: center;
     gap: 0.75rem;
     padding: 1rem;
-    background: #f9f9f9;
-    border-radius: 4px;
+    background: #fafafa;
     margin-bottom: 0.5rem;
+    border: 1px solid #e5e5e5;
   }
 
   .todo-checkbox {
     width: 20px;
     height: 20px;
     cursor: pointer;
+    accent-color: #000;
   }
 
   .todo-title {
     flex: 1;
     font-size: 1rem;
+    color: #000;
   }
 
   .todo-title.completed {
@@ -183,15 +182,15 @@
   .delete-button {
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
-    background: #e74c3c;
-    color: white;
-    border: none;
-    border-radius: 4px;
+    background: none;
+    color: #999;
+    border: 1px solid #d4d4d4;
     cursor: pointer;
   }
 
   .delete-button:hover {
-    background: #c0392b;
+    color: #000;
+    border-color: #000;
   }
 
   .stats {
@@ -200,6 +199,6 @@
     color: #666;
     font-size: 0.875rem;
     padding-top: 1rem;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid #e5e5e5;
   }
 </style>

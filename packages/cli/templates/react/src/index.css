@@ -3,5 +3,6 @@
 @tailwind utilities;
 
 body {
-  @apply m-0 min-h-screen bg-slate-950 text-slate-100 antialiased;
+  @apply m-0 min-h-screen bg-white text-black antialiased;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
 }
