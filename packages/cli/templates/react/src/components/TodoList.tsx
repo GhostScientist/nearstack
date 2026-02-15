@@ -4,11 +4,7 @@ import { TodoModel } from '../models/Todo';
 
 export function TodoList() {
   const [title, setTitle] = useState('');
-  const { data: todos = [], loading } = useLiveQuery(
-    () => TodoModel.table().getAll(),
-    [],
-    TodoModel
-  );
+  const { data: todos = [], loading } = useLiveQuery(() => TodoModel.table().getAll(), [], TodoModel);
 
   const addTodo = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -22,40 +18,36 @@ export function TodoList() {
     setTitle('');
   };
 
-  const toggle = async (id: string, completed: boolean) => {
-    await TodoModel.table().update(id, { completed: !completed });
-  };
-
-  const remove = async (id: string) => {
-    await TodoModel.table().delete(id);
-  };
-
   return (
-    <section className="card">
-      <h2>Todos</h2>
-      <form onSubmit={addTodo} className="todo-form">
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Add a task" />
-        <button type="submit">Add</button>
+    <section className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+      <h2 className="text-xl font-semibold">Todos</h2>
+      <form onSubmit={addTodo} className="mt-3 flex gap-2">
+        <input
+          className="flex-1 rounded-md border border-slate-700 bg-slate-950 px-3 py-2"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Add a task"
+        />
+        <button className="rounded-md bg-cyan-500 px-4 py-2 font-medium text-slate-950">Add</button>
       </form>
-
-      {loading ? <p>Loading...</p> : null}
-
-      <ul className="todo-list">
+      {loading ? <p className="mt-3 text-sm text-slate-400">Loading...</p> : null}
+      <ul className="mt-4 space-y-2">
         {todos.map((todo) => (
-          <li key={todo.id}>
-            <label>
+          <li key={todo.id} className="flex items-center justify-between rounded-md border border-slate-700 p-2">
+            <label className="flex items-center gap-3">
               <input
                 type="checkbox"
                 checked={todo.completed}
                 onChange={() => {
-                  void toggle(todo.id, todo.completed);
+                  void TodoModel.table().update(todo.id, { completed: !todo.completed });
                 }}
               />
-              <span className={todo.completed ? 'done' : ''}>{todo.title}</span>
+              <span className={todo.completed ? 'text-slate-500 line-through' : ''}>{todo.title}</span>
             </label>
             <button
+              className="text-sm text-rose-300"
               onClick={() => {
-                void remove(todo.id);
+                void TodoModel.table().delete(todo.id);
               }}
             >
               Delete
