@@ -1,7 +1,7 @@
 {
   "name": "@nearstack-dev/rtc",
-  "version": "0.1.1",
-  "description": "WebRTC + CRDT sync layer (stub for now)",
+  "version": "0.2.0",
+  "description": "WebRTC + CRDT peer-to-peer sync layer for nearstack",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,7 +14,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "echo \"No tests yet\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "pnpm build"
   },
   "author": "Dakota Kim",
@@ -23,6 +24,7 @@
     "@nearstack-dev/core": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
   }
 }

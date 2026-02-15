@@ -1,68 +1,43 @@
-// WebRTC + CRDT sync layer (stub for now)
+// @nearstack-dev/rtc — WebRTC + CRDT P2P sync layer
+//
+// Provides peer-to-peer data synchronization using WebRTC data channels
+// and Last-Write-Wins CRDTs for conflict-free merging.
 
-export interface SyncPeer {
-  id: string;
-  connection: RTCPeerConnection | null;
-}
+// ─── Core engine ───────────────────────────────────────────────────
+export { SyncEngine, SyncDocumentHandle } from './sync/index.js';
 
-export interface CRDTDocument {
-  id: string;
-  data: any;
-  version: number;
-}
+// ─── CRDT primitives ───────────────────────────────────────────────
+export { HLC, compareTimestamps } from './crdt/index.js';
+export { LWWMap } from './crdt/index.js';
 
-export interface SyncEvent {
-  type: string;
-  data: any;
-}
+// ─── Signaling channels ───────────────────────────────────────────
+export { BroadcastSignaling } from './signaling/index.js';
+export { WebSocketSignaling } from './signaling/index.js';
 
-export interface SyncEngineConfig {
-  roomId: string;
-  onSync: (event: SyncEvent) => void;
-}
+// ─── Peer connection management ────────────────────────────────────
+export { PeerConnection } from './peer/index.js';
+export { PeerManager } from './peer/index.js';
 
-export class SyncEngine {
-  private peers: Map<string, SyncPeer> = new Map();
-  private documents: Map<string, CRDTDocument> = new Map();
-  private connected = false;
-  private config: SyncEngineConfig;
-
-  constructor(config: SyncEngineConfig) {
-    this.config = config;
-  }
-
-  async connect(): Promise<void> {
-    // Stub: Will implement WebRTC connection logic
-    console.log(`Connecting to room: ${this.config.roomId}`);
-    this.connected = true;
-  }
-
-  async disconnect(): Promise<void> {
-    // Stub: Will implement disconnect logic
-    console.log(`Disconnecting from room: ${this.config.roomId}`);
-    this.connected = false;
-  }
-
-  async broadcast(type: string, data: any): Promise<void> {
-    // Stub: Will implement broadcast logic
-    console.log(`Broadcasting ${type}:`, data);
-    
-    // Simulate receiving own message for demo
-    setTimeout(() => {
-      this.config.onSync({ type, data: `Remote: ${data}` });
-    }, 1000);
-  }
-
-  async sync(documentId: string): Promise<void> {
-    // Stub: Will implement CRDT sync logic
-    console.log(`Syncing document: ${documentId}`);
-  }
-
-  isConnected(): boolean {
-    return this.connected;
-  }
-}
-
-export function createSyncEngine(config: SyncEngineConfig): SyncEngine {
-  return new SyncEngine(config);
-}
+// ─── Types ─────────────────────────────────────────────────────────
+export type {
+  HLCTimestamp,
+  LWWEntry,
+  LWWMapState,
+  CRDTChange,
+  SignalingMessageType,
+  SignalingMessage,
+  SignalingChannel,
+  PeerConnectionState,
+  PeerInfo,
+  PeerManagerConfig,
+  DataChannelMessageType,
+  DataChannelMessage,
+  SyncRequestPayload,
+  SyncResponsePayload,
+  ChangePayload,
+  SyncEngineConfig,
+  SyncDocument,
+  SyncEventType,
+  SyncEvent,
+  SyncEventHandler,
+} from './types.js';
