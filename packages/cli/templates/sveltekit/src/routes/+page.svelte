@@ -19,7 +19,12 @@
     if (!items.length) return undefined;
     const pending = items.filter((todo) => !todo.completed).map((todo) => `- ${todo.title}`).join('\n');
     const complete = items.filter((todo) => todo.completed).map((todo) => `- ${todo.title}`).join('\n');
-    return ['You are a helpful assistant with access to local todos.', pending ? `Pending todos:\n${pending}` : '', complete ? `Completed todos:\n${complete}` : '']
+    return [
+      'You are a helpful assistant. The user has local todo data.',
+      pending ? `Pending todos:\n${pending}` : '',
+      complete ? `Completed todos:\n${complete}` : '',
+      'Use this context when it helps answer questions.',
+    ]
       .filter(Boolean)
       .join('\n\n');
   }
@@ -82,7 +87,11 @@
     isSending = true;
 
     try {
-      const reply = await ai.chat(next, { systemPrompt: buildSystemPrompt(todos) });
+      const systemPrompt = buildSystemPrompt(todos);
+      const apiMessages: Message[] = systemPrompt
+        ? [{ role: 'system', content: systemPrompt }, ...next]
+        : next;
+      const reply = await ai.chat(apiMessages);
       messages = [...next, { role: 'assistant', content: reply }];
     } catch (chatError) {
       error = chatError instanceof Error ? chatError.message : 'Chat failed';
@@ -126,7 +135,7 @@
   <aside class="space-y-4">
     <section class="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
       <h2 class="text-xl font-semibold">Model Setup</h2>
-      <select class="mt-3 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2" bind:value={selectedModel} on:change={(event) => selectModel((event.target as HTMLSelectElement).value)}>
+      <select class="mt-3 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2" bind:value={selectedModel} on:change={() => selectModel(selectedModel)}>
         <option value="">Select a model</option>
         {#each models as model (model.id)}
           <option value={model.id}>{model.provider} · {model.name}</option>
@@ -138,7 +147,10 @@
     </section>
 
     <section class="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
-      <h2 class="text-xl font-semibold">AI Chat</h2>
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-xl font-semibold">AI Chat</h2>
+        <button class="text-sm text-slate-300" on:click={() => { messages = []; error = ''; }}>Clear</button>
+      </div>
       <div class="mt-3 h-80 space-y-2 overflow-y-auto rounded-md border border-slate-700 bg-slate-950 p-2">
         {#if messages.length === 0}
           <p class="text-sm text-slate-400">Ask AI about your todos.</p>

@@ -21,7 +21,12 @@ function buildSystemPrompt(items: Todo[]): string | undefined {
   if (!items.length) return undefined;
   const pending = items.filter((todo) => !todo.completed).map((todo) => `- ${todo.title}`).join('\n');
   const complete = items.filter((todo) => todo.completed).map((todo) => `- ${todo.title}`).join('\n');
-  return ['You are a helpful assistant with local todo context.', pending ? `Pending todos:\n${pending}` : '', complete ? `Completed todos:\n${complete}` : '']
+  return [
+    'You are a helpful assistant. The user has local todo data.',
+    pending ? `Pending todos:\n${pending}` : '',
+    complete ? `Completed todos:\n${complete}` : '',
+    'Use this context when it helps answer questions.',
+  ]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -81,7 +86,11 @@ async function sendMessage() {
   messages.value = next;
   isSending.value = true;
   try {
-    const reply = await ai.chat(next, { systemPrompt: buildSystemPrompt(todos.value) });
+    const systemPrompt = buildSystemPrompt(todos.value);
+    const apiMessages: Message[] = systemPrompt
+      ? [{ role: 'system', content: systemPrompt }, ...next]
+      : next;
+    const reply = await ai.chat(apiMessages);
     messages.value = [...next, { role: 'assistant', content: reply }];
   } catch (chatError) {
     error.value = chatError instanceof Error ? chatError.message : 'Chat failed';
