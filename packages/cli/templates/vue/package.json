@@ -5,27 +5,22 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vue-tsc -b && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@nearstack-dev/core": "^0.1.0",
-    "@nearstack-dev/react": "^0.1.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-markdown": "^9.0.0",
+    "@mlc-ai/web-llm": "^0.2.79",
     "@nearstack-dev/ai": "^0.1.0",
-    "@mlc-ai/web-llm": "^0.2.80"
+    "@nearstack-dev/core": "^0.1.0",
+    "vue": "^3.5.13"
   },
   "devDependencies": {
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.2.1",
+    "@vitejs/plugin-vue": "^5.2.1",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.3.3",
     "vite": "^5.1.0",
-    "vite-plugin-pwa": "^0.20.5"
+    "vue-tsc": "^2.2.0"
   }
 }

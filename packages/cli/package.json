@@ -18,18 +18,19 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "echo \"No tests yet\"",
+    "test": "vitest run",
     "prepublishOnly": "pnpm build"
   },
   "author": "Dakota Kim",
   "license": "MIT",
   "dependencies": {
-    "prompts": "^2.4.2",
-    "kolorist": "^1.8.0"
+    "kolorist": "^1.8.0",
+    "prompts": "^2.4.2"
   },
   "devDependencies": {
     "@types/node": "^20.11.19",
     "@types/prompts": "^2.4.9",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.8"
   }
 }
