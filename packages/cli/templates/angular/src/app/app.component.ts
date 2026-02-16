@@ -36,7 +36,7 @@ export class AppComponent implements OnInit {
     const pending = items.filter((todo) => !todo.completed).map((todo) => `- ${todo.title}`).join('\n');
     const complete = items.filter((todo) => todo.completed).map((todo) => `- ${todo.title}`).join('\n');
     return [
-      'You are a helpful assistant. The user has local todo data.',
+      'You are a helpful assistant with local todo context.',
       pending ? `Pending todos:\n${pending}` : '',
       complete ? `Completed todos:\n${complete}` : '',
       'Use this context when it helps answer questions.',
