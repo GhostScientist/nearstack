@@ -46,11 +46,11 @@
   },
   "devDependencies": {
     "@mlc-ai/web-llm": "^0.2.80",
-    "@vitest/coverage-v8": "^1.6.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "fake-indexeddb": "^5.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.3.3",
-    "vitest": "^1.6.0"
+    "vitest": "^4.1.11"
   },
   "keywords": [
     "ai",
