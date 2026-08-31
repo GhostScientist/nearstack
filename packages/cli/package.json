@@ -28,9 +28,9 @@
     "prompts": "^2.4.2"
   },
   "devDependencies": {
-    "@types/node": "^20.11.19",
+    "@types/node": "^26.4.0",
     "@types/prompts": "^2.4.9",
-    "typescript": "^5.3.3",
+    "typescript": "^7.0.2",
     "vitest": "^2.1.8"
   }
 }
