@@ -19,7 +19,9 @@ export function useAI(instance: AI = defaultAI) {
 
     instance.ready().catch((readyError) => {
       if (!mounted) return;
-      setError(readyError instanceof Error ? readyError.message : String(readyError));
+      setError(
+        readyError instanceof Error ? readyError.message : String(readyError)
+      );
       setIsLoading(false);
     });
 

@@ -72,7 +72,9 @@ describe('StateManager', () => {
     });
 
     it('should catch and log listener errors', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       const badListener = vi.fn(() => {
         throw new Error('Listener error');
       });
@@ -137,10 +139,16 @@ describe('StateManager', () => {
       ];
 
       manager.update({ models });
-      manager.updateModelStatus('model-1', { state: 'downloading', progress: 0.5 });
+      manager.updateModelStatus('model-1', {
+        state: 'downloading',
+        progress: 0.5,
+      });
 
       const state = manager.getState();
-      expect(state.models[0].status).toEqual({ state: 'downloading', progress: 0.5 });
+      expect(state.models[0].status).toEqual({
+        state: 'downloading',
+        progress: 0.5,
+      });
       expect(state.models[1].status).toEqual({ state: 'available' });
     });
   });
@@ -153,7 +161,10 @@ describe('StateManager', () => {
       ];
 
       manager.update({ providers });
-      manager.updateProviderStatus('provider-1', { available: true, modelCount: 3 });
+      manager.updateProviderStatus('provider-1', {
+        available: true,
+        modelCount: 3,
+      });
 
       const state = manager.getState();
       expect(state.providers[0]).toEqual({
@@ -324,9 +335,15 @@ describe('StateManager', () => {
 
       const state = manager.getState();
       expect(state.models).toHaveLength(2);
-      expect(state.models.find((m) => m.id === 'other-provider-model')).toBeDefined();
-      expect(state.models.find((m) => m.id === 'test-provider-new')).toBeDefined();
-      expect(state.models.find((m) => m.id === 'test-provider-old')).toBeUndefined();
+      expect(
+        state.models.find((m) => m.id === 'other-provider-model')
+      ).toBeDefined();
+      expect(
+        state.models.find((m) => m.id === 'test-provider-new')
+      ).toBeDefined();
+      expect(
+        state.models.find((m) => m.id === 'test-provider-old')
+      ).toBeUndefined();
     });
   });
 

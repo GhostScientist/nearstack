@@ -1,0 +1,8 @@
+# Revisions that are pure reformatting. Skip them when attributing lines:
+#
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# GitHub's blame view honours this file automatically.
+
+# Format packages/*/src with Prettier
+baf64410b4f8424b7e32796d61d052f22f133968

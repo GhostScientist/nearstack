@@ -31,7 +31,10 @@ describe('core store + model', () => {
       const model = defineModel<Todo>('todos-test-crud');
       const table = model.table();
 
-      const created = await table.insert({ title: 'Write tests', completed: false });
+      const created = await table.insert({
+        title: 'Write tests',
+        completed: false,
+      });
       expect(created.id).toBeTruthy();
 
       const fetched = await table.get(created.id);
@@ -69,9 +72,13 @@ describe('core store + model', () => {
     const restore = useInMemoryWindow();
     try {
       const model = defineModel<Todo>('todos-memory');
-      const inserted = await model.table().insert({ title: 'offline', completed: false });
+      const inserted = await model
+        .table()
+        .insert({ title: 'offline', completed: false });
 
-      expect((await model.table().getAll()).map((item) => item.id)).toContain(inserted.id);
+      expect((await model.table().getAll()).map((item) => item.id)).toContain(
+        inserted.id
+      );
     } finally {
       restore();
     }
@@ -84,7 +91,9 @@ describe('core store + model', () => {
     const unsubscribe = model.subscribe(callback);
 
     try {
-      const row = await model.table().insert({ title: 'IndexedDB test', completed: false });
+      const row = await model
+        .table()
+        .insert({ title: 'IndexedDB test', completed: false });
       await model.table().update(row.id, { completed: true });
       await model.table().delete(row.id);
 

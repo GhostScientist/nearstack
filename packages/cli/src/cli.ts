@@ -27,7 +27,11 @@ if (command === 'create' || command === 'init') {
   console.log('that makes the browser the backend.');
   console.log('');
   console.log('Usage:');
-  console.log(`  ${blue('nearstack create <project-name>')}  - Create a new Nearstack app`);
-  console.log(`  ${blue('nearstack init <project-name>')}    - Initialize a new Nearstack app`);
+  console.log(
+    `  ${blue('nearstack create <project-name>')}  - Create a new Nearstack app`
+  );
+  console.log(
+    `  ${blue('nearstack init <project-name>')}    - Initialize a new Nearstack app`
+  );
   console.log('');
 }

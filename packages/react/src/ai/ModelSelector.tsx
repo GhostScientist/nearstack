@@ -15,11 +15,14 @@ export function ModelSelector({ ai }: ModelSelectorProps) {
     isDownloading,
   } = useModelSelector(ai);
 
-  const groups = choices.reduce<Record<string, typeof choices>>((acc, choice) => {
-    if (!acc[choice.group]) acc[choice.group] = [];
-    acc[choice.group].push(choice);
-    return acc;
-  }, {});
+  const groups = choices.reduce<Record<string, typeof choices>>(
+    (acc, choice) => {
+      if (!acc[choice.group]) acc[choice.group] = [];
+      acc[choice.group].push(choice);
+      return acc;
+    },
+    {}
+  );
 
   return (
     <div>
@@ -38,7 +41,11 @@ export function ModelSelector({ ai }: ModelSelectorProps) {
         {Object.entries(groups).map(([group, items]) => (
           <optgroup key={group} label={group}>
             {items.map((choice) => (
-              <option key={choice.value} value={choice.value} disabled={choice.disabled}>
+              <option
+                key={choice.value}
+                value={choice.value}
+                disabled={choice.disabled}
+              >
                 {choice.label} ({choice.size})
               </option>
             ))}
@@ -54,7 +61,9 @@ export function ModelSelector({ ai }: ModelSelectorProps) {
             void downloadModel(activeModel);
           }}
         >
-          {isDownloading ? `Downloading ${Math.round(downloadProgress * 100)}%` : 'Download Model'}
+          {isDownloading
+            ? `Downloading ${Math.round(downloadProgress * 100)}%`
+            : 'Download Model'}
         </button>
       )}
     </div>

@@ -47,7 +47,7 @@ jobs:
         run: pnpm test
 
   lint:
-    name: Lint
+    name: Lint and format
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -69,3 +69,9 @@ jobs:
 
       - name: ESLint
         run: pnpm lint
+
+      # Kept in step with the `format` script in the root package.json. If that
+      # glob changes and this one does not, CI silently stops checking exactly
+      # the files `pnpm format` writes.
+      - name: Prettier
+        run: pnpm exec prettier --check "packages/*/src/**/*.{ts,tsx,json}"

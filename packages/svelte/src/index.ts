@@ -25,7 +25,9 @@ export function modelStore<T = any>(
   };
 }
 
-export function liveQuery<T = any>(query: () => Promise<T>): Writable<T | undefined> {
+export function liveQuery<T = any>(
+  query: () => Promise<T>
+): Writable<T | undefined> {
   const store = writable<T | undefined>(undefined);
 
   // Execute the query and update the store

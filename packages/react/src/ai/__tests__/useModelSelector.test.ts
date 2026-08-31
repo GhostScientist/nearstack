@@ -40,7 +40,7 @@ function makeMockAI(models: ModelInfo[]): MockAI {
     subscribe: () => () => undefined,
     ready: vi.fn().mockResolvedValue(undefined),
     models: {
-      get: (id: string) => state.models.find(m => m.id === id),
+      get: (id: string) => state.models.find((m) => m.id === id),
       download,
       use,
     },
@@ -95,7 +95,10 @@ describe('useModelSelector', () => {
 
     let resolveDownload: () => void;
     download.mockImplementation(
-      () => new Promise<void>(res => { resolveDownload = res; })
+      () =>
+        new Promise<void>((res) => {
+          resolveDownload = res;
+        })
     );
 
     const { result } = renderHook(() => useModelSelector(ai));
