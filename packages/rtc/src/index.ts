@@ -46,7 +46,7 @@ export class SyncEngine {
   async broadcast(type: string, data: any): Promise<void> {
     // Stub: Will implement broadcast logic
     console.log(`Broadcasting ${type}:`, data);
-    
+
     // Simulate receiving own message for demo
     setTimeout(() => {
       this.config.onSync({ type, data: `Remote: ${data}` });

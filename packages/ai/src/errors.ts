@@ -114,17 +114,10 @@ export class AIError extends Error {
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         return new AIError(AIErrorCode.NETWORK_ERROR, error.message, error);
       }
-      return new AIError(
-        code || AIErrorCode.UNKNOWN,
-        error.message,
-        error
-      );
+      return new AIError(code || AIErrorCode.UNKNOWN, error.message, error);
     }
 
-    return new AIError(
-      code || AIErrorCode.UNKNOWN,
-      String(error)
-    );
+    return new AIError(code || AIErrorCode.UNKNOWN, String(error));
   }
 
   /**

@@ -111,7 +111,10 @@ export interface Provider {
   /** Generate a chat completion (non-streaming) */
   chat(messages: Message[], options: ChatOptions): Promise<string>;
   /** Generate a streaming chat completion */
-  stream(messages: Message[], options: ChatOptions): AsyncGenerator<StreamChunk>;
+  stream(
+    messages: Message[],
+    options: ChatOptions
+  ): AsyncGenerator<StreamChunk>;
 }
 
 /**
@@ -119,7 +122,10 @@ export interface Provider {
  */
 export interface BrowserProviderInterface extends Provider {
   /** Download a model to local cache */
-  downloadModel(modelId: string, onProgress?: (progress: number) => void): Promise<void>;
+  downloadModel(
+    modelId: string,
+    onProgress?: (progress: number) => void
+  ): Promise<void>;
   /** Delete a cached model */
   deleteModel(modelId: string): Promise<void>;
   /** Cancel an in-progress download */

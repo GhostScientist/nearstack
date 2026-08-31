@@ -70,7 +70,9 @@ describe('createUIHelpers', () => {
       ];
 
       const state = createMockState({
-        providers: [{ id: 'browser', type: 'browser', available: true, modelCount: 1 }],
+        providers: [
+          { id: 'browser', type: 'browser', available: true, modelCount: 1 },
+        ],
         models,
       });
       const helpers = createUIHelpers(() => state);
@@ -93,7 +95,9 @@ describe('createUIHelpers', () => {
       ];
 
       const state = createMockState({
-        providers: [{ id: 'browser', type: 'browser', available: true, modelCount: 1 }],
+        providers: [
+          { id: 'browser', type: 'browser', available: true, modelCount: 1 },
+        ],
         models,
       });
       const helpers = createUIHelpers(() => state);
@@ -115,7 +119,9 @@ describe('createUIHelpers', () => {
       ];
 
       const state = createMockState({
-        providers: [{ id: 'browser', type: 'browser', available: true, modelCount: 1 }],
+        providers: [
+          { id: 'browser', type: 'browser', available: true, modelCount: 1 },
+        ],
         models,
       });
       const helpers = createUIHelpers(() => state);

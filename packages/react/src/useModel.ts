@@ -11,7 +11,8 @@ export function useModel<T = any>(model: Model<T>, id: string) {
     setLoading(true);
     setError(null);
 
-    model.store.get(id)
+    model.store
+      .get(id)
       .then((value) => {
         if (!mounted) return;
         setData(value);

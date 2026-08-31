@@ -2,7 +2,12 @@
 
 import type { StateListener, Unsubscribe } from './types.js';
 
-export type { Message, BaseProvider, StateListener, Unsubscribe } from './types.js';
+export type {
+  Message,
+  BaseProvider,
+  StateListener,
+  Unsubscribe,
+} from './types.js';
 
 export interface Store<T = any> {
   get(id: string): Promise<T | undefined>;
@@ -132,13 +137,18 @@ class IndexedDBStore<T extends { id: string }> implements Store<T> {
       this.db = await getDatabase(this.dbName);
       this.isInitialized = true;
     } catch (error) {
-      console.warn('IndexedDB unavailable, falling back to in-memory storage:', error);
+      console.warn(
+        'IndexedDB unavailable, falling back to in-memory storage:',
+        error
+      );
       this.fallbackStore = new InMemoryStore<T>(this.notifyChange);
       this.isInitialized = true;
     }
   }
 
-  private async getObjectStore(mode: IDBTransactionMode = 'readonly'): Promise<IDBObjectStore> {
+  private async getObjectStore(
+    mode: IDBTransactionMode = 'readonly'
+  ): Promise<IDBObjectStore> {
     await this.init();
     if (!this.db) throw new Error('Database not initialized');
     const transaction = this.db.transaction([this.storeName], mode);

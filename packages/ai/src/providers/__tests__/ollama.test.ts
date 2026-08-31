@@ -247,7 +247,10 @@ describe('OllamaProvider', () => {
 
   describe('stream', () => {
     it('should throw error when no model specified', async () => {
-      const generator = provider.stream([{ role: 'user', content: 'Hello' }], {});
+      const generator = provider.stream(
+        [{ role: 'user', content: 'Hello' }],
+        {}
+      );
 
       await expect(generator.next()).rejects.toMatchObject({
         code: AIErrorCode.MODEL_NOT_FOUND,

@@ -18,32 +18,38 @@ export interface SearchResult {
 }
 
 export class TextSplitter {
-  constructor(private chunkSize: number = 512, private overlap: number = 50) {}
+  constructor(
+    private chunkSize: number = 512,
+    private overlap: number = 50
+  ) {}
 
   split(text: string): TextChunk[] {
     const chunks: TextChunk[] = [];
-    
+
     // First, split by paragraphs to preserve document structure
-    const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-    
+    const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+
     let chunkId = 0;
     let currentChunk = '';
-    
+
     for (const paragraph of paragraphs) {
       const sentences = this.splitIntoSentences(paragraph);
-      
+
       for (const sentence of sentences) {
         // If adding this sentence would exceed chunk size, save current chunk
-        if (currentChunk.length + sentence.length > this.chunkSize && currentChunk.length > 0) {
+        if (
+          currentChunk.length + sentence.length > this.chunkSize &&
+          currentChunk.length > 0
+        ) {
           chunks.push({
             id: `chunk-${chunkId++}`,
             text: currentChunk.trim(),
-            metadata: { 
+            metadata: {
               wordCount: currentChunk.split(/\s+/).length,
-              charCount: currentChunk.length 
-            }
+              charCount: currentChunk.length,
+            },
           });
-          
+
           // Start new chunk with overlap from previous chunk
           if (this.overlap > 0) {
             const words = currentChunk.split(/\s+/);
@@ -53,36 +59,36 @@ export class TextSplitter {
             currentChunk = '';
           }
         }
-        
+
         currentChunk += sentence + ' ';
       }
-      
+
       // Add paragraph break
       currentChunk += '\n';
     }
-    
+
     // Add final chunk if it has content
     if (currentChunk.trim().length > 0) {
       chunks.push({
         id: `chunk-${chunkId++}`,
         text: currentChunk.trim(),
-        metadata: { 
+        metadata: {
           wordCount: currentChunk.split(/\s+/).length,
-          charCount: currentChunk.length 
-        }
+          charCount: currentChunk.length,
+        },
       });
     }
 
     return chunks;
   }
-  
+
   private splitIntoSentences(text: string): string[] {
     // Simple sentence splitting - in production, use a proper NLP library
     return text
       .split(/[.!?]+/)
-      .map(s => s.trim())
-      .filter(s => s.length > 0)
-      .map(s => s + '.');
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .map((s) => s + '.');
   }
 }
 
@@ -94,7 +100,10 @@ export class VectorStore {
     this.embeddings.push(embedding);
   }
 
-  async search(_queryVector: number[], _k: number = 5): Promise<SearchResult[]> {
+  async search(
+    _queryVector: number[],
+    _k: number = 5
+  ): Promise<SearchResult[]> {
     // Stub: Will implement vector similarity search
     return [];
   }
@@ -121,7 +130,7 @@ export class RAGEngine {
       text,
     };
     this.chunks.push(chunk);
-    
+
     const vector = await createEmbedding(text);
     await this.vectorStore.addEmbedding({
       id: chunk.id,
@@ -134,19 +143,19 @@ export class RAGEngine {
     // Enhanced text matching with scoring
     const results: RAGSearchResult[] = [];
     const queryLower = query.toLowerCase();
-    const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2); // Filter short words
-    
+    const queryWords = queryLower.split(/\s+/).filter((w) => w.length > 2); // Filter short words
+
     for (const chunk of this.chunks) {
       const text = chunk.text.toLowerCase();
       let score = 0;
       let matchCount = 0;
-      
+
       // Exact phrase match (highest score)
       if (text.includes(queryLower)) {
         score += 2.0;
         matchCount++;
       }
-      
+
       // Individual word matches
       for (const word of queryWords) {
         if (text.includes(word)) {
@@ -156,14 +165,14 @@ export class RAGEngine {
           matchCount++;
         }
       }
-      
+
       // Boost score based on chunk metadata if available
       if (chunk.metadata?.wordCount) {
         // Prefer shorter, more focused chunks for better relevance
         const lengthPenalty = Math.min(chunk.metadata.wordCount / 100, 0.5);
         score = score * (1 - lengthPenalty);
       }
-      
+
       // Only include chunks with matches
       if (matchCount > 0) {
         // Calculate relative score based on match percentage
@@ -175,11 +184,9 @@ export class RAGEngine {
         });
       }
     }
-    
+
     // Sort by score (descending) and return top k results
-    return results
-      .sort((a, b) => b.score - a.score)
-      .slice(0, k);
+    return results.sort((a, b) => b.score - a.score).slice(0, k);
   }
 }
 

@@ -356,9 +356,10 @@ describe('AI', () => {
 
     describe('download', () => {
       it('returns the same promise for concurrent calls with the same modelId', async () => {
-        const { provider, pendingDownloads } = createMockBrowserProvider('browser', [
-          createMockModel('model-a', 'browser', { state: 'available' }),
-        ]);
+        const { provider, pendingDownloads } = createMockBrowserProvider(
+          'browser',
+          [createMockModel('model-a', 'browser', { state: 'available' })]
+        );
         const ai = new AI({ providers: [provider], autoInitialize: true });
         await ai.ready();
 
@@ -374,10 +375,13 @@ describe('AI', () => {
       });
 
       it('rejects a different modelId while one is in flight', async () => {
-        const { provider, pendingDownloads } = createMockBrowserProvider('browser', [
-          createMockModel('model-a', 'browser', { state: 'available' }),
-          createMockModel('model-b', 'browser', { state: 'available' }),
-        ]);
+        const { provider, pendingDownloads } = createMockBrowserProvider(
+          'browser',
+          [
+            createMockModel('model-a', 'browser', { state: 'available' }),
+            createMockModel('model-b', 'browser', { state: 'available' }),
+          ]
+        );
         const ai = new AI({ providers: [provider], autoInitialize: true });
         await ai.ready();
 
@@ -398,9 +402,10 @@ describe('AI', () => {
       });
 
       it('allows a fresh download after a previous download fails', async () => {
-        const { provider, pendingDownloads } = createMockBrowserProvider('browser', [
-          createMockModel('model-a', 'browser', { state: 'available' }),
-        ]);
+        const { provider, pendingDownloads } = createMockBrowserProvider(
+          'browser',
+          [createMockModel('model-a', 'browser', { state: 'available' })]
+        );
         const ai = new AI({ providers: [provider], autoInitialize: true });
         await ai.ready();
 

@@ -31,21 +31,30 @@ export function useChat(instance: AI = defaultAI, options?: UseChatOptions) {
     try {
       // Build the message array for the API, injecting system prompt if provided
       const apiMessages: Message[] = options?.systemPrompt
-        ? [{ role: 'system', content: options.systemPrompt }, ...messagesRef.current]
+        ? [
+            { role: 'system', content: options.systemPrompt },
+            ...messagesRef.current,
+          ]
         : messagesRef.current;
 
       for await (const chunk of instance.stream(apiMessages, chatOptions)) {
         assistantText += chunk.content;
         setMessages((prev) => {
           // Update only if last message is not assistant or needs updating
-          const withoutIncomplete = prev[prev.length - 1]?.role === 'assistant'
-            ? prev.slice(0, -1)
-            : prev;
-          return [...withoutIncomplete, { role: 'assistant', content: assistantText }];
+          const withoutIncomplete =
+            prev[prev.length - 1]?.role === 'assistant'
+              ? prev.slice(0, -1)
+              : prev;
+          return [
+            ...withoutIncomplete,
+            { role: 'assistant', content: assistantText },
+          ];
         });
       }
     } catch (streamError) {
-      setError(streamError instanceof Error ? streamError.message : String(streamError));
+      setError(
+        streamError instanceof Error ? streamError.message : String(streamError)
+      );
     } finally {
       setIsStreaming(false);
     }

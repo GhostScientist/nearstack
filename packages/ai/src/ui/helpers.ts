@@ -89,7 +89,13 @@ export function createUIHelpers(getState: () => AIState) {
    * Get a human-readable label for a model's status.
    */
   function getStatusLabel(
-    state: 'available' | 'downloading' | 'cached' | 'loading' | 'ready' | 'error'
+    state:
+      | 'available'
+      | 'downloading'
+      | 'cached'
+      | 'loading'
+      | 'ready'
+      | 'error'
   ): string {
     return getModelStatusLabel(state);
   }

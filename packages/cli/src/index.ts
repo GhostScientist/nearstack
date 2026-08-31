@@ -138,8 +138,12 @@ export async function scaffold(projectName: string): Promise<void> {
   console.log('Next steps:');
   console.log();
   console.log(`  ${blue('cd')} ${projectName}`);
-  console.log(`  ${blue('npm install')}  ${yellow('# or pnpm install, yarn install')}`);
-  console.log(`  ${blue('npm run dev')}   ${yellow('# start the development server')}`);
+  console.log(
+    `  ${blue('npm install')}  ${yellow('# or pnpm install, yarn install')}`
+  );
+  console.log(
+    `  ${blue('npm run dev')}   ${yellow('# start the development server')}`
+  );
   console.log();
   console.log('Happy coding! 🚀');
   console.log();
