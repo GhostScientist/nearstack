@@ -8,6 +8,11 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['nearstack-icon-192.svg', 'nearstack-icon-512.svg'],
+      workbox: {
+        // The bundle includes the WebLLM runtime and exceeds Workbox's 2 MiB
+        // default. Precaching it is the point: the app must boot offline.
+        maximumFileSizeToCacheInBytes: 12 * 1024 * 1024
+      },
       manifest: {
         name: '{{PROJECT_NAME}}',
         short_name: '{{PROJECT_NAME}}',

@@ -21,6 +21,10 @@
     return new Date(timestamp).toLocaleDateString();
   }
 
+  function handleSearchInput(e: Event): void {
+    dispatch('search', (e.target as HTMLInputElement).value);
+  }
+
   $: pinned = notes.filter(n => n.pinned);
   $: unpinned = notes.filter(n => !n.pinned);
 </script>
@@ -30,7 +34,7 @@
     <input
       type="text"
       value={search}
-      on:input={e => dispatch('search', (e.target as HTMLInputElement).value)}
+      on:input={handleSearchInput}
       placeholder="Search notes..."
       class="w-full border border-neutral-300 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-black focus:outline-none"
     />
