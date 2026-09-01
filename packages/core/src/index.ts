@@ -137,17 +137,23 @@ class IndexedDBStore<T extends { id: string }> implements Store<T> {
       await getDatabase(this.dbName);
       this.status = { backend: 'indexeddb', persistent: true };
     } catch (error) {
-      if (this.mode !== 'auto') {
-        throw error instanceof StorageError
+      const storageError =
+        error instanceof StorageError
           ? error
           : new StorageError(
               'STORAGE_UNAVAILABLE',
               `Persistent storage is unavailable for model "${this.storeName}".`,
               error
             );
+
+      // Only degrade for a permanently unavailable backend. UPGRADE_BLOCKED
+      // and OPEN_FAILED are transient, and silently switching to an empty
+      // in-memory store would discard writes that belong on disk.
+      if (this.mode !== 'auto' || storageError.code !== 'STORAGE_UNAVAILABLE') {
+        throw storageError;
       }
 
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = storageError.message;
       console.warn(
         `[nearstack] Model "${this.storeName}" fell back to non-persistent ` +
           `in-memory storage: ${reason}`

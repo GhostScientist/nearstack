@@ -93,6 +93,7 @@ const dbStoreNames = new Map<string, Set<string>>();
 const dbConnections = new Map<string, Promise<IDBDatabase>>();
 const openConnections = new Map<string, Set<IDBDatabase>>();
 const openQueue = new Map<string, Promise<unknown>>();
+const abandonedUpgrades = new Map<string, Promise<IDBDatabase>>();
 
 export function registerStoreName(dbName: string, storeName: string): void {
   let stores = dbStoreNames.get(dbName);
@@ -173,17 +174,73 @@ export function getDatabase(dbName: string): Promise<IDBDatabase> {
   return promise;
 }
 
-function openOrUpgrade(dbName: string): Promise<IDBDatabase> {
+async function openOrUpgrade(dbName: string): Promise<IDBDatabase> {
   const factory = getIndexedDBFactory();
   if (!factory) {
-    return Promise.reject(
-      new StorageError(
-        'STORAGE_UNAVAILABLE',
-        'IndexedDB is not available in this context.'
-      )
+    throw new StorageError(
+      'STORAGE_UNAVAILABLE',
+      'IndexedDB is not available in this context.'
     );
   }
 
+  // An upgrade we already reported as blocked is still sitting in the
+  // database's connection queue and cannot be cancelled. Opening again now
+  // would queue behind it forever, so wait for it to drain first.
+  const abandoned = abandonedUpgrades.get(dbName);
+  if (abandoned) await waitForAbandonedUpgrade(dbName, abandoned);
+
+  return openWithSchema(dbName, factory);
+}
+
+function waitForAbandonedUpgrade(
+  dbName: string,
+  abandoned: Promise<IDBDatabase>
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(
+        new StorageError(
+          'UPGRADE_BLOCKED',
+          `Database "${dbName}" is still blocked by another open connection. ` +
+            'Close other tabs using this app and retry.'
+        )
+      );
+    }, config.blockedTimeoutMs);
+
+    const done = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    abandoned.then(done, done);
+  });
+}
+
+/**
+ * Records an upgrade request we gave up waiting on. It stays queued inside
+ * IndexedDB, so later opens must wait for it rather than queue behind it.
+ */
+function abandonUpgrade(
+  dbName: string,
+  upgradeDone: Promise<IDBDatabase>
+): void {
+  abandonedUpgrades.set(dbName, upgradeDone);
+  const forget = () => {
+    if (abandonedUpgrades.get(dbName) === upgradeDone) {
+      abandonedUpgrades.delete(dbName);
+    }
+  };
+  upgradeDone.then((db) => {
+    forget();
+    // Nobody is waiting on this handle any more; leaving it open would
+    // block the next upgrade.
+    db.close();
+  }, forget);
+}
+
+function openWithSchema(
+  dbName: string,
+  factory: IDBFactory
+): Promise<IDBDatabase> {
   const neededStores = dbStoreNames.get(dbName) ?? new Set<string>();
 
   return new Promise<IDBDatabase>((resolve, reject) => {
@@ -217,14 +274,26 @@ function openOrUpgrade(dbName: string): Promise<IDBDatabase> {
       closeOwnConnections(dbName);
 
       const upgradeReq = factory.open(dbName, newVersion);
+      const upgradeDone = new Promise<IDBDatabase>((settle, fail) => {
+        upgradeReq.onsuccess = () => settle(upgradeReq.result);
+        upgradeReq.onerror = () =>
+          fail(
+            new StorageError(
+              'OPEN_FAILED',
+              `Failed to upgrade database "${dbName}".`,
+              upgradeReq.error
+            )
+          );
+      });
+      upgradeReq.onupgradeneeded = (event) => {
+        const udb = (event.target as IDBOpenDBRequest).result;
+        createMissingStores(udb, neededStores);
+      };
+
       let blockedTimer: ReturnType<typeof setTimeout> | undefined;
-      let settled = false;
-      const settle = (fn: () => void) => {
+      const clearBlockedTimer = () => {
         if (blockedTimer !== undefined) clearTimeout(blockedTimer);
         blockedTimer = undefined;
-        if (settled) return;
-        settled = true;
-        fn();
       };
 
       upgradeReq.onblocked = () => {
@@ -235,8 +304,7 @@ function openOrUpgrade(dbName: string): Promise<IDBDatabase> {
         if (blockedTimer !== undefined) return;
         blockedTimer = setTimeout(() => {
           blockedTimer = undefined;
-          if (settled) return;
-          settled = true;
+          abandonUpgrade(dbName, upgradeDone);
           reject(
             new StorageError(
               'UPGRADE_BLOCKED',
@@ -247,29 +315,19 @@ function openOrUpgrade(dbName: string): Promise<IDBDatabase> {
           );
         }, config.blockedTimeoutMs);
       };
-      upgradeReq.onerror = () =>
-        settle(() =>
-          reject(
-            new StorageError(
-              'OPEN_FAILED',
-              `Failed to upgrade database "${dbName}".`,
-              upgradeReq.error
-            )
-          )
-        );
-      upgradeReq.onsuccess = () => {
-        if (settled) {
-          // The upgrade completed after we already reported it blocked.
-          // Don't leak the connection or it blocks the next upgrade.
-          upgradeReq.result.close();
-          return;
+
+      // Resolving after the blocked timeout is a no-op; `abandonUpgrade`
+      // owns the connection in that case.
+      upgradeDone.then(
+        (upgraded) => {
+          clearBlockedTimer();
+          resolve(upgraded);
+        },
+        (error) => {
+          clearBlockedTimer();
+          reject(error);
         }
-        settle(() => resolve(upgradeReq.result));
-      };
-      upgradeReq.onupgradeneeded = (event) => {
-        const udb = (event.target as IDBOpenDBRequest).result;
-        createMissingStores(udb, neededStores);
-      };
+      );
     };
 
     // DB doesn't exist yet — create fresh with all registered stores
@@ -301,6 +359,7 @@ export function resetStorage(): void {
   openConnections.clear();
   dbConnections.clear();
   openQueue.clear();
+  abandonedUpgrades.clear();
   dbStoreNames.clear();
   config.mode = 'indexeddb';
   config.blockedTimeoutMs = 3000;

@@ -234,7 +234,10 @@ const status = await NoteModel.ready();
 
 Non-persistent storage is **opt-in**. Pass `storage: 'memory'` for a
 deliberately ephemeral store (tests, previews), or `storage: 'auto'` to prefer
-IndexedDB and degrade to memory when it is unavailable:
+IndexedDB and degrade to memory when it is permanently unavailable. `'auto'`
+does *not* degrade on transient failures such as `'UPGRADE_BLOCKED'` — those
+are surfaced and retried, so a momentarily blocked upgrade can never strand a
+model on an empty in-memory store:
 
 ```ts
 const Draft = defineModel<Draft>('drafts', { storage: 'memory' });
@@ -266,7 +269,10 @@ route or a code-split chunk. Registering a new model after the shared database
 is already open triggers a schema upgrade: existing connections close on
 `versionchange` and reopen transparently. If another tab holds the database
 open and never closes it, the upgrade rejects with a `StorageError` whose
-`code` is `'UPGRADE_BLOCKED'` instead of hanging.
+`code` is `'UPGRADE_BLOCKED'` instead of hanging. That request stays queued
+inside IndexedDB, so nearstack waits for it to drain before opening again —
+other models fail fast with `'UPGRADE_BLOCKED'` rather than queueing behind it,
+and everything recovers automatically once the other tab closes.
 
 ### Storage limits
 

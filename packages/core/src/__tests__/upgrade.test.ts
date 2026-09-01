@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StorageError, configureStorage, defineModel } from '../index';
 
 interface Row {
@@ -17,6 +17,7 @@ function openRaw(name: string): Promise<IDBDatabase> {
 
 afterEach(() => {
   configureStorage({ mode: 'indexeddb', blockedTimeoutMs: 3000 });
+  vi.restoreAllMocks();
 });
 
 describe('schema upgrades', () => {
@@ -64,6 +65,43 @@ describe('schema upgrades', () => {
     expect(await first.table().getAll()).toHaveLength(1);
   });
 
+  it('does not strand other models behind an abandoned blocked upgrade', async () => {
+    const working = defineModel<Row>('strand_working');
+    await working.table().insert({ n: 1 });
+
+    const squatter = await openRaw('nearstack');
+    configureStorage({ blockedTimeoutMs: 50 });
+
+    try {
+      const late = defineModel<Row>('strand_late');
+      await expect(late.ready()).rejects.toBeInstanceOf(StorageError);
+
+      // The abandoned upgrade request is still queued inside IndexedDB, so a
+      // read on the already-working model must fail fast rather than queue
+      // behind it forever.
+      const result = await Promise.race([
+        working
+          .table()
+          .getAll()
+          .then(
+            () => 'resolved',
+            (error: unknown) => error
+          ),
+        new Promise((resolve) => setTimeout(() => resolve('HUNG'), 2000)),
+      ]);
+
+      expect(result).not.toBe('HUNG');
+      expect(result).toBeInstanceOf(StorageError);
+      expect((result as StorageError).code).toBe('UPGRADE_BLOCKED');
+    } finally {
+      squatter.close();
+    }
+
+    // ...and everything recovers once the blocker goes away.
+    configureStorage({ blockedTimeoutMs: 3000 });
+    expect(await working.table().getAll()).toHaveLength(1);
+  });
+
   it('closes our own connections on versionchange', async () => {
     const first = defineModel<Row>('vc_first');
     await first.table().insert({ n: 1 });
@@ -78,6 +116,39 @@ describe('schema upgrades', () => {
 
     // The previously created model transparently reopens.
     expect(await first.table().getAll()).toHaveLength(1);
+  });
+
+  it('auto mode does not degrade permanently on a transient blocked upgrade', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const first = defineModel<Row>('auto_blocked_first');
+    await first.table().insert({ n: 1 });
+
+    const squatter = await openRaw('nearstack');
+    configureStorage({ blockedTimeoutMs: 50 });
+
+    const late = defineModel<Row>('auto_blocked_late', { storage: 'auto' });
+
+    // A blocked upgrade is transient, so `auto` must surface it rather than
+    // silently switching to an empty in-memory store forever.
+    const error = await late.ready().then(
+      () => undefined,
+      (e: unknown) => e
+    );
+    expect(error).toBeInstanceOf(StorageError);
+    expect((error as StorageError).code).toBe('UPGRADE_BLOCKED');
+    expect(warn).not.toHaveBeenCalled();
+
+    squatter.close();
+    configureStorage({ blockedTimeoutMs: 3000 });
+
+    await expect(late.ready()).resolves.toMatchObject({
+      backend: 'indexeddb',
+      persistent: true,
+    });
+
+    const row = await late.table().insert({ n: 99 });
+    const reader = defineModel<Row>('auto_blocked_late');
+    expect(await reader.table().get(row.id)).toMatchObject({ n: 99 });
   });
 
   it('creates one object store per model in the shared database', async () => {
