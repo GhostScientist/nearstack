@@ -20,8 +20,16 @@ updates:
           - 'vitest'
           - '@vitest/*'
       # Everything else dev-only, batched to cut PR noise.
+      #
+      # Minor and patch only. A grouped PR is all-or-nothing: one breaking
+      # major in the batch turns the whole thing red and blocks every safe
+      # bump riding along with it. Majors are excluded here so they arrive as
+      # single-dependency PRs that can be reviewed, and reverted, on their own.
       dev-dependencies:
         dependency-type: development
+        update-types:
+          - minor
+          - patch
         exclude-patterns:
           - '@typescript-eslint/*'
           - 'vitest'
