@@ -21,7 +21,7 @@ This single line creates:
 - An IndexedDB object store named `'notes'` in the `'nearstack'` database
 - A `table()` interface for CRUD operations
 - A `subscribe()` method for change notifications
-- Automatic fallback to in-memory storage if IndexedDB is unavailable
+- A `ready()` method that resolves once storage is initialized
 
 ## Models
 
@@ -204,9 +204,69 @@ It does **not** persist across:
 - Incognito/private browsing sessions
 - Different browsers or devices
 
-### In-memory fallback
+### When storage is unavailable
 
-If IndexedDB is unavailable (e.g., in certain testing environments), the data layer falls back to an in-memory `Map`. The API is identical, but data doesn't persist across page loads.
+If IndexedDB is unavailable — a locked-down context, or storage denied in
+Safari private browsing — nearstack **fails loudly** rather than silently
+pretending to persist. Every table operation rejects with a `StorageError`
+whose `code` is `'STORAGE_UNAVAILABLE'`:
+
+```ts
+import { StorageError, defineModel } from '@nearstack-dev/core';
+
+const NoteModel = defineModel<Note>('notes');
+
+try {
+  await NoteModel.ready();
+} catch (error) {
+  if (error instanceof StorageError) {
+    // Show the user that their data can't be saved.
+  }
+}
+```
+
+`ready()` resolves with a `StorageStatus` describing the backend in use:
+
+```ts
+const status = await NoteModel.ready();
+// { backend: 'indexeddb', persistent: true }
+```
+
+Non-persistent storage is **opt-in**. Pass `storage: 'memory'` for a
+deliberately ephemeral store (tests, previews), or `storage: 'auto'` to prefer
+IndexedDB and degrade to memory when it is unavailable:
+
+```ts
+const Draft = defineModel<Draft>('drafts', { storage: 'memory' });
+
+const Notes = defineModel<Note>('notes', { storage: 'auto' });
+const status = await Notes.ready();
+if (!status.persistent) {
+  console.warn(`Running without persistence: ${status.reason}`);
+}
+```
+
+You can change the default for every model with `configureStorage`:
+
+```ts
+import { configureStorage } from '@nearstack-dev/core';
+
+configureStorage({ mode: 'auto' });
+```
+
+### Workers and Service Workers
+
+Storage detection reads `indexedDB` from `globalThis`, so models work in
+Workers and Service Workers, where `indexedDB` exists but `window` does not.
+
+### Defining models lazily
+
+`defineModel()` may be called at any time, including from a lazily imported
+route or a code-split chunk. Registering a new model after the shared database
+is already open triggers a schema upgrade: existing connections close on
+`versionchange` and reopen transparently. If another tab holds the database
+open and never closes it, the upgrade rejects with a `StorageError` whose
+`code` is `'UPGRADE_BLOCKED'` instead of hanging.
 
 ### Storage limits
 
