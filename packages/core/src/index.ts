@@ -1,6 +1,16 @@
 // IndexedDB runtime, defineModel(), base Store interface
 
 import type { StateListener, Unsubscribe } from './types.js';
+import {
+  StorageError,
+  getDatabase,
+  getIndexedDBFactory,
+  getStorageConfig,
+  isConnectionClosedError,
+  invalidateConnection,
+  registerStoreName,
+} from './storage.js';
+import type { StorageMode, StorageStatus } from './storage.js';
 
 export type {
   Message,
@@ -9,6 +19,22 @@ export type {
   Unsubscribe,
 } from './types.js';
 
+export {
+  StorageError,
+  configureStorage,
+  getStorageConfig,
+  resetStorage,
+} from './storage.js';
+export type {
+  StorageBackend,
+  StorageConfig,
+  StorageErrorCode,
+  StorageMode,
+  StorageStatus,
+} from './storage.js';
+
+export const DEFAULT_DATABASE = 'nearstack';
+
 export interface Store<T = any> {
   get(id: string): Promise<T | undefined>;
   set(id: string, value: T): Promise<void>;
@@ -16,6 +42,8 @@ export interface Store<T = any> {
   getAll(): Promise<T[]>;
   insert(value: Omit<T, 'id'>): Promise<T>;
   update(id: string, value: Partial<T>): Promise<T | undefined>;
+  /** Resolves once the backend is chosen, reporting whether it persists. */
+  ready?(): Promise<StorageStatus>;
 }
 
 export interface Table<T = any> {
@@ -32,201 +60,184 @@ export interface Model<T = any> {
   store: Store<T>;
   table(): Table<T>;
   subscribe(callback: StateListener): Unsubscribe;
+  /**
+   * Resolves once storage is initialized. Rejects with a {@link StorageError}
+   * when persistent storage is required but unavailable.
+   */
+  ready(): Promise<StorageStatus>;
 }
 
-// ─── Shared DB connection manager ──────────────────────────────────
-// Tracks all registered store names per database and shares a single
-// connection, upgrading the schema when new stores are discovered.
-// All defineModel() calls must happen at module import time (before
-// any store operations) so that every store is registered before the
-// shared connection is opened.
-
-const _dbStoreNames = new Map<string, Set<string>>();
-const _dbConnections = new Map<string, Promise<IDBDatabase>>();
-
-function registerStoreName(dbName: string, storeName: string): void {
-  let stores = _dbStoreNames.get(dbName);
-  if (!stores) {
-    stores = new Set();
-    _dbStoreNames.set(dbName, stores);
-  }
-  stores.add(storeName);
-  // Invalidate cached connection so the next access checks for missing stores
-  _dbConnections.delete(dbName);
+export interface DefineModelOptions {
+  /** Storage backend selection. Defaults to the configured global mode. */
+  storage?: StorageMode;
+  /** Database name. Defaults to `nearstack`. */
+  database?: string;
 }
 
-function getDatabase(dbName: string): Promise<IDBDatabase> {
-  const cached = _dbConnections.get(dbName);
-  if (cached) return cached;
-
-  const promise = openOrUpgrade(dbName);
-  _dbConnections.set(dbName, promise);
-  return promise;
-}
-
-function openOrUpgrade(dbName: string): Promise<IDBDatabase> {
-  const neededStores = _dbStoreNames.get(dbName) ?? new Set<string>();
-
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    // Open without an explicit version to discover the current state
-    const probeReq = indexedDB.open(dbName);
-
-    probeReq.onerror = () => reject(probeReq.error);
-
-    probeReq.onsuccess = () => {
-      const db = probeReq.result;
-      const missing = [...neededStores].filter(
-        (s) => !db.objectStoreNames.contains(s)
-      );
-
-      if (missing.length === 0) {
-        resolve(db);
-        return;
-      }
-
-      // Upgrade needed — bump version and create missing stores
-      const newVersion = db.version + 1;
-      db.close();
-
-      const upgradeReq = indexedDB.open(dbName, newVersion);
-      upgradeReq.onerror = () => reject(upgradeReq.error);
-      upgradeReq.onsuccess = () => resolve(upgradeReq.result);
-      upgradeReq.onupgradeneeded = (event) => {
-        const udb = (event.target as IDBOpenDBRequest).result;
-        for (const store of neededStores) {
-          if (!udb.objectStoreNames.contains(store)) {
-            udb.createObjectStore(store, { keyPath: 'id' });
-          }
-        }
-      };
+function runRequest<R>(
+  db: IDBDatabase,
+  storeName: string,
+  mode: IDBTransactionMode,
+  make: (store: IDBObjectStore) => IDBRequest<R>
+): Promise<R> {
+  return new Promise<R>((resolve, reject) => {
+    const transaction = db.transaction([storeName], mode);
+    let result: R;
+    const request = make(transaction.objectStore(storeName));
+    request.onsuccess = () => {
+      result = request.result;
     };
-
-    // DB doesn't exist yet — create fresh with all registered stores
-    probeReq.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      for (const store of neededStores) {
-        if (!db.objectStoreNames.contains(store)) {
-          db.createObjectStore(store, { keyPath: 'id' });
-        }
-      }
-    };
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => resolve(result);
+    transaction.onabort = () =>
+      reject(transaction.error ?? new Error('Transaction aborted'));
   });
 }
 
 class IndexedDBStore<T extends { id: string }> implements Store<T> {
-  private db: IDBDatabase | null = null;
   private fallbackStore?: InMemoryStore<T>;
-  private isInitialized = false;
+  private status?: StorageStatus;
+  private initPromise?: Promise<void>;
 
   constructor(
     private dbName: string,
     private storeName: string,
-    private notifyChange: () => void
+    private notifyChange: () => void,
+    private mode: Exclude<StorageMode, 'memory'>
   ) {
     registerStoreName(dbName, storeName);
   }
 
-  private async init(): Promise<void> {
-    if (this.isInitialized) return;
+  async ready(): Promise<StorageStatus> {
+    await this.init();
+    return this.status as StorageStatus;
+  }
+
+  private init(): Promise<void> {
+    if (!this.initPromise) {
+      this.initPromise = this.resolveBackend().catch((error) => {
+        // Allow a later retry (e.g. storage becomes available again).
+        this.initPromise = undefined;
+        throw error;
+      });
+    }
+    return this.initPromise;
+  }
+
+  private async resolveBackend(): Promise<void> {
+    if (this.status) return;
 
     try {
-      if (typeof window === 'undefined' || !window.indexedDB) {
-        throw new Error('IndexedDB not available');
+      if (!getIndexedDBFactory()) {
+        throw new StorageError(
+          'STORAGE_UNAVAILABLE',
+          'IndexedDB is not available in this context.'
+        );
+      }
+      await getDatabase(this.dbName);
+      this.status = { backend: 'indexeddb', persistent: true };
+    } catch (error) {
+      const storageError =
+        error instanceof StorageError
+          ? error
+          : new StorageError(
+              'STORAGE_UNAVAILABLE',
+              `Persistent storage is unavailable for model "${this.storeName}".`,
+              error
+            );
+
+      // Only degrade for a permanently unavailable backend. UPGRADE_BLOCKED
+      // and OPEN_FAILED are transient, and silently switching to an empty
+      // in-memory store would discard writes that belong on disk.
+      if (this.mode !== 'auto' || storageError.code !== 'STORAGE_UNAVAILABLE') {
+        throw storageError;
       }
 
-      this.db = await getDatabase(this.dbName);
-      this.isInitialized = true;
-    } catch (error) {
+      const reason = storageError.message;
       console.warn(
-        'IndexedDB unavailable, falling back to in-memory storage:',
-        error
+        `[nearstack] Model "${this.storeName}" fell back to non-persistent ` +
+          `in-memory storage: ${reason}`
       );
-      this.fallbackStore = new InMemoryStore<T>(this.notifyChange);
-      this.isInitialized = true;
+      this.fallbackStore = new InMemoryStore<T>(this.notifyChange, {
+        backend: 'memory',
+        persistent: false,
+        reason,
+      });
+      this.status = { backend: 'memory', persistent: false, reason };
     }
   }
 
-  private async getObjectStore(
-    mode: IDBTransactionMode = 'readonly'
-  ): Promise<IDBObjectStore> {
-    await this.init();
-    if (!this.db) throw new Error('Database not initialized');
-    const transaction = this.db.transaction([this.storeName], mode);
-    return transaction.objectStore(this.storeName);
+  /** Runs `work` against a live connection, retrying once if it went stale. */
+  private async withConnection<R>(
+    work: (db: IDBDatabase) => Promise<R>
+  ): Promise<R> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const db = await getDatabase(this.dbName);
+      try {
+        return await work(db);
+      } catch (error) {
+        lastError = error;
+        if (attempt === 0 && isConnectionClosedError(error)) {
+          // The connection was closed by a schema upgrade — reopen and retry.
+          invalidateConnection(this.dbName);
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw lastError;
   }
 
   async get(id: string): Promise<T | undefined> {
     await this.init();
+    if (this.fallbackStore) return this.fallbackStore.get(id);
 
-    if (this.fallbackStore) {
-      return this.fallbackStore.get(id);
-    }
-
-    const store = await this.getObjectStore('readonly');
-    return new Promise((resolve, reject) => {
-      const request = store.get(id);
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
+    return this.withConnection((db) =>
+      runRequest<T | undefined>(db, this.storeName, 'readonly', (store) =>
+        store.get(id)
+      )
+    );
   }
 
   async set(id: string, value: T): Promise<void> {
     await this.init();
-
     if (this.fallbackStore) {
       await this.fallbackStore.set(id, value);
       return;
     }
 
-    const store = await this.getObjectStore('readwrite');
-    await new Promise<void>((resolve, reject) => {
-      const request = store.put(value);
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
-
+    await this.withConnection((db) =>
+      runRequest(db, this.storeName, 'readwrite', (store) => store.put(value))
+    );
     this.notifyChange();
   }
 
   async delete(id: string): Promise<void> {
     await this.init();
-
     if (this.fallbackStore) {
       await this.fallbackStore.delete(id);
       return;
     }
 
-    const store = await this.getObjectStore('readwrite');
-    await new Promise<void>((resolve, reject) => {
-      const request = store.delete(id);
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
-
+    await this.withConnection((db) =>
+      runRequest(db, this.storeName, 'readwrite', (store) => store.delete(id))
+    );
     this.notifyChange();
   }
 
   async getAll(): Promise<T[]> {
     await this.init();
+    if (this.fallbackStore) return this.fallbackStore.getAll();
 
-    if (this.fallbackStore) {
-      return this.fallbackStore.getAll();
-    }
-
-    const store = await this.getObjectStore('readonly');
-    return new Promise((resolve, reject) => {
-      const request = store.getAll();
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
+    return this.withConnection((db) =>
+      runRequest<T[]>(db, this.storeName, 'readonly', (store) => store.getAll())
+    );
   }
 
   async insert(value: Omit<T, 'id'>): Promise<T> {
     await this.init();
-
-    if (this.fallbackStore) {
-      return this.fallbackStore.insert(value);
-    }
+    if (this.fallbackStore) return this.fallbackStore.insert(value);
 
     const id = crypto.randomUUID();
     const item = { ...value, id } as T;
@@ -236,15 +247,35 @@ class IndexedDBStore<T extends { id: string }> implements Store<T> {
 
   async update(id: string, value: Partial<T>): Promise<T | undefined> {
     await this.init();
+    if (this.fallbackStore) return this.fallbackStore.update(id, value);
 
-    if (this.fallbackStore) {
-      return this.fallbackStore.update(id, value);
-    }
+    // Read-modify-write inside a single readwrite transaction. IndexedDB
+    // serializes overlapping readwrite transactions, so concurrent updates to
+    // the same record queue up instead of clobbering each other.
+    const updated = await this.withConnection(
+      (db) =>
+        new Promise<T | undefined>((resolve, reject) => {
+          const transaction = db.transaction([this.storeName], 'readwrite');
+          const store = transaction.objectStore(this.storeName);
+          let result: T | undefined;
 
-    const existing = await this.get(id);
-    if (!existing) return undefined;
-    const updated = { ...existing, ...value };
-    await this.set(id, updated);
+          const getRequest = store.get(id);
+          getRequest.onerror = () => reject(getRequest.error);
+          getRequest.onsuccess = () => {
+            const existing = getRequest.result as T | undefined;
+            if (!existing) return;
+            result = { ...existing, ...value, id } as T;
+            const putRequest = store.put(result);
+            putRequest.onerror = () => reject(putRequest.error);
+          };
+
+          transaction.oncomplete = () => resolve(result);
+          transaction.onabort = () =>
+            reject(transaction.error ?? new Error('Transaction aborted'));
+        })
+    );
+
+    if (updated) this.notifyChange();
     return updated;
   }
 }
@@ -252,7 +283,18 @@ class IndexedDBStore<T extends { id: string }> implements Store<T> {
 class InMemoryStore<T extends { id: string }> implements Store<T> {
   private data: Map<string, T> = new Map();
 
-  constructor(private notifyChange: () => void) {}
+  constructor(
+    private notifyChange: () => void,
+    private status: StorageStatus = {
+      backend: 'memory',
+      persistent: false,
+      reason: 'In-memory storage was requested explicitly.',
+    }
+  ) {}
+
+  async ready(): Promise<StorageStatus> {
+    return this.status;
+  }
 
   async get(id: string): Promise<T | undefined> {
     return this.data.get(id);
@@ -282,7 +324,7 @@ class InMemoryStore<T extends { id: string }> implements Store<T> {
   async update(id: string, value: Partial<T>): Promise<T | undefined> {
     const existing = await this.get(id);
     if (!existing) return undefined;
-    const updated = { ...existing, ...value };
+    const updated = { ...existing, ...value, id } as T;
     await this.set(id, updated);
     return updated;
   }
@@ -317,12 +359,21 @@ class TableImpl<T extends { id: string }> implements Table<T> {
   }
 }
 
-export function defineModel<T extends { id: string }>(name: string): Model<T> {
+export function defineModel<T extends { id: string }>(
+  name: string,
+  options: DefineModelOptions = {}
+): Model<T> {
   const listeners = new Set<StateListener>();
   const notify = () => {
     for (const callback of listeners) callback();
   };
-  const store = new IndexedDBStore<T>('nearstack', name, notify);
+
+  const dbName = options.database ?? DEFAULT_DATABASE;
+  const mode = options.storage ?? getStorageConfig().mode;
+  const store: Store<T> =
+    mode === 'memory'
+      ? new InMemoryStore<T>(notify)
+      : new IndexedDBStore<T>(dbName, name, notify, mode);
 
   return {
     name,
@@ -333,6 +384,11 @@ export function defineModel<T extends { id: string }>(name: string): Model<T> {
     subscribe(callback: StateListener): Unsubscribe {
       listeners.add(callback);
       return () => listeners.delete(callback);
+    },
+    ready(): Promise<StorageStatus> {
+      return store.ready
+        ? store.ready()
+        : Promise.resolve({ backend: 'memory', persistent: false });
     },
   };
 }
