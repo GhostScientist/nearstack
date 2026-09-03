@@ -89,7 +89,11 @@ async function send() {
   messages.value = next;
   isSending.value = true;
   try {
-    const reply = await props.ai.chat(next, { systemPrompt: buildSystemPrompt() });
+    const systemPrompt = buildSystemPrompt();
+    const apiMessages: Message[] = systemPrompt
+      ? [{ role: 'system', content: systemPrompt }, ...next]
+      : next;
+    const reply = await props.ai.chat(apiMessages);
     messages.value = [...next, { role: 'assistant', content: reply }];
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Chat failed';

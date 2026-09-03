@@ -83,7 +83,11 @@
     messages = next;
     isSending = true;
     try {
-      const reply = await ai.chat(next, { systemPrompt: buildSystemPrompt() });
+      const systemPrompt = buildSystemPrompt();
+      const apiMessages: Message[] = systemPrompt
+        ? [{ role: 'system', content: systemPrompt }, ...next]
+        : next;
+      const reply = await ai.chat(apiMessages);
       messages = [...next, { role: 'assistant', content: reply }];
     } catch (e) {
       error = e instanceof Error ? e.message : 'Chat failed';
