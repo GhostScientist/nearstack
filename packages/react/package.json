@@ -58,7 +58,7 @@
     "@nearstack-dev/ai": "workspace:*",
     "@testing-library/react": "^16.2.0",
     "@types/react": "^19.0.0",
-    "jsdom": "^26.0.0",
+    "jsdom": "^30.0.1",
     "react": "^19.0.0",
     "tsup": "^8.4.0",
     "typescript": "^5.3.3",
