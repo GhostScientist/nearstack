@@ -132,10 +132,7 @@ function compatibleStorageModes(
 
 function getModelChannel<T extends { id: string }>(
   name: string,
-  registration: Omit<
-    ModelRegistration,
-    'channel' | 'migrationsSignature'
-  > & {
+  registration: Omit<ModelRegistration, 'channel' | 'migrationsSignature'> & {
     migrations: MigrationDefinition<T>;
   }
 ): ModelChannel {

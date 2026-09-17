@@ -57,8 +57,7 @@ export interface SchemaMigration<T extends { id: string }> {
 }
 
 export type MigrationDefinition<T extends { id: string }> =
-  | readonly SchemaMigration<T>[]
-  | Readonly<Record<number, (record: T) => T>>;
+  readonly SchemaMigration<T>[] | Readonly<Record<number, (record: T) => T>>;
 
 export const SCHEMA_METADATA_STORE = '__nearstack_schema';
 
