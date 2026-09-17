@@ -8,9 +8,18 @@ import {
   getStorageConfig,
   isConnectionClosedError,
   invalidateConnection,
+  migrateModel,
   registerStoreName,
+  requestPersistence,
+  normalizeStorageError,
+  resetStorage as resetStorageState,
 } from './storage.js';
-import type { StorageMode, StorageStatus } from './storage.js';
+import type {
+  MigrationDefinition,
+  SchemaMigration,
+  StorageMode,
+  StorageStatus,
+} from './storage.js';
 
 export type {
   Message,
@@ -23,19 +32,22 @@ export {
   StorageError,
   configureStorage,
   getStorageConfig,
-  resetStorage,
+  requestPersistence,
 } from './storage.js';
 export type {
   StorageBackend,
   StorageConfig,
   StorageErrorCode,
+  MigrationDefinition,
+  PersistenceStatus,
+  SchemaMigration,
   StorageMode,
   StorageStatus,
 } from './storage.js';
 
 export const DEFAULT_DATABASE = 'nearstack';
 
-export interface Store<T = any> {
+export interface Store<T extends { id: string } = { id: string }> {
   get(id: string): Promise<T | undefined>;
   set(id: string, value: T): Promise<void>;
   delete(id: string): Promise<void>;
@@ -46,7 +58,7 @@ export interface Store<T = any> {
   ready?(): Promise<StorageStatus>;
 }
 
-export interface Table<T = any> {
+export interface Table<T extends { id: string } = { id: string }> {
   insert(value: Omit<T, 'id'>): Promise<T>;
   update(id: string, value: Partial<T>): Promise<T | undefined>;
   delete(id: string): Promise<void>;
@@ -55,7 +67,7 @@ export interface Table<T = any> {
   find(predicate: (item: T) => boolean): Promise<T[]>;
 }
 
-export interface Model<T = any> {
+export interface Model<T extends { id: string } = { id: string }> {
   name: string;
   store: Store<T>;
   table(): Table<T>;
@@ -67,11 +79,117 @@ export interface Model<T = any> {
   ready(): Promise<StorageStatus>;
 }
 
-export interface DefineModelOptions {
+export interface DefineModelOptions<T extends { id: string } = { id: string }> {
   /** Storage backend selection. Defaults to the configured global mode. */
   storage?: StorageMode;
   /** Database name. Defaults to `nearstack`. */
   database?: string;
+  /** The model schema understood by this application. Existing data starts at 1. */
+  schemaVersion?: number;
+  /** Ordered synchronous transformations from one schema version to the next. */
+  migrations?: MigrationDefinition<T>;
+}
+
+interface ModelChannel {
+  listeners: Set<StateListener>;
+  notify(): void;
+}
+
+interface ModelRegistration<T extends { id: string }> {
+  database: string;
+  mode: Exclude<StorageMode, 'memory'>;
+  schemaVersion: number;
+  migrationsSignature: string;
+  channel: ModelChannel;
+}
+
+const modelRegistrations = new Map<string, ModelRegistration<{ id: string }>>();
+
+function schemaSignature<T extends { id: string }>(
+  migrations: MigrationDefinition<T>
+): string {
+  const steps = Array.isArray(migrations)
+    ? migrations.map((step) => [step.from, step.to, String(step.migrate)])
+    : Object.entries(migrations).map(([from, migrate]) => [
+        Number(from),
+        Number(from) + 1,
+        String(migrate),
+      ]);
+  return JSON.stringify(steps);
+}
+
+function compatibleStorageModes(
+  left: Exclude<StorageMode, 'memory'>,
+  right: Exclude<StorageMode, 'memory'>
+): boolean {
+  // `auto` and `indexeddb` both require the same persistent backend when the
+  // model is available. Treating them as compatible lets a recovered model
+  // be reopened by a caller using the explicit default.
+  return (
+    left === right ||
+    (left === 'auto' && right === 'indexeddb') ||
+    (left === 'indexeddb' && right === 'auto')
+  );
+}
+
+function getModelChannel<T extends { id: string }>(
+  name: string,
+  registration: Omit<
+    ModelRegistration<T>,
+    'channel' | 'migrationsSignature'
+  > & {
+    migrations: MigrationDefinition<T>;
+  }
+): ModelChannel {
+  const key = `${registration.database}\u0000${name}`;
+  const existing = modelRegistrations.get(key) as
+    | ModelRegistration<T>
+    | undefined;
+  const signature = schemaSignature(registration.migrations);
+
+  if (existing) {
+    if (
+      !compatibleStorageModes(existing.mode, registration.mode) ||
+      existing.schemaVersion !== registration.schemaVersion ||
+      existing.migrationsSignature !== signature
+    ) {
+      throw new StorageError(
+        'CONFIGURATION_CONFLICT',
+        `Model "${name}" in database "${registration.database}" was ` +
+          'defined more than once with incompatible storage or schema options.'
+      );
+    }
+    return existing.channel;
+  }
+
+  const channel: ModelChannel = {
+    listeners: new Set<StateListener>(),
+    notify() {
+      for (const callback of [...channel.listeners]) callback();
+    },
+  };
+  modelRegistrations.set(key, {
+    database: registration.database,
+    mode: registration.mode,
+    schemaVersion: registration.schemaVersion,
+    migrationsSignature: signature,
+    channel,
+  });
+  return channel;
+}
+
+function resetModelRegistry(): void {
+  modelRegistrations.clear();
+}
+
+function createModelChannel(): ModelChannel {
+  const channel: ModelChannel = {
+    listeners: new Set<StateListener>(),
+    notify() {
+      for (const callback of [...channel.listeners]) callback();
+    },
+  };
+  return channel;
 }
 
 function runRequest<R>(
@@ -81,16 +199,48 @@ function runRequest<R>(
   make: (store: IDBObjectStore) => IDBRequest<R>
 ): Promise<R> {
   return new Promise<R>((resolve, reject) => {
-    const transaction = db.transaction([storeName], mode);
-    let result: R;
+    let transaction: IDBTransaction;
+    try {
+      transaction = db.transaction([storeName], mode);
+    } catch (error) {
+      reject(
+        normalizeStorageError(
+          error,
+          'OPEN_FAILED',
+          `Could not open a ${mode} transaction for "${storeName}".`
+        )
+      );
+      return;
+    }
+    let result: R | undefined;
+    let settled = false;
+    const fail = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(
+        normalizeStorageError(
+          error,
+          'OPEN_FAILED',
+          `Storage operation on "${storeName}" failed.`
+        )
+      );
+    };
     const request = make(transaction.objectStore(storeName));
     request.onsuccess = () => {
       result = request.result;
     };
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => resolve(result);
+    request.onerror = () => fail(request.error);
+    transaction.oncomplete = () => {
+      if (!settled) {
+        settled = true;
+        resolve(result as R);
+      }
+    };
     transaction.onabort = () =>
-      reject(transaction.error ?? new Error('Transaction aborted'));
+      fail(transaction.error ?? new Error('Transaction aborted'));
+    transaction.onerror = () => {
+      if (transaction.error) fail(transaction.error);
+    };
   });
 }
 
@@ -103,7 +253,11 @@ class IndexedDBStore<T extends { id: string }> implements Store<T> {
     private dbName: string,
     private storeName: string,
     private notifyChange: () => void,
-    private mode: Exclude<StorageMode, 'memory'>
+    private mode: Exclude<StorageMode, 'memory'>,
+    private schema: {
+      schemaVersion: number;
+      migrations: MigrationDefinition<T>;
+    }
   ) {
     registerStoreName(dbName, storeName);
   }
@@ -134,7 +288,8 @@ class IndexedDBStore<T extends { id: string }> implements Store<T> {
           'IndexedDB is not available in this context.'
         );
       }
-      await getDatabase(this.dbName);
+      const db = await getDatabase(this.dbName);
+      await migrateModel(db, this.storeName, this.schema);
       this.status = { backend: 'indexeddb', persistent: true };
     } catch (error) {
       const storageError =
@@ -361,19 +516,26 @@ class TableImpl<T extends { id: string }> implements Table<T> {
 
 export function defineModel<T extends { id: string }>(
   name: string,
-  options: DefineModelOptions = {}
+  options: DefineModelOptions<T> = {}
 ): Model<T> {
-  const listeners = new Set<StateListener>();
-  const notify = () => {
-    for (const callback of listeners) callback();
-  };
-
   const dbName = options.database ?? DEFAULT_DATABASE;
   const mode = options.storage ?? getStorageConfig().mode;
+  const schema = {
+    schemaVersion: options.schemaVersion ?? 1,
+    migrations: options.migrations ?? [],
+  };
+  const channel =
+    mode === 'memory'
+      ? createModelChannel()
+      : getModelChannel(name, {
+          database: dbName,
+          mode,
+          ...schema,
+        });
   const store: Store<T> =
     mode === 'memory'
-      ? new InMemoryStore<T>(notify)
-      : new IndexedDBStore<T>(dbName, name, notify, mode);
+      ? new InMemoryStore<T>(channel.notify)
+      : new IndexedDBStore<T>(dbName, name, channel.notify, mode, schema);
 
   return {
     name,
@@ -382,8 +544,8 @@ export function defineModel<T extends { id: string }>(
       return new TableImpl(store);
     },
     subscribe(callback: StateListener): Unsubscribe {
-      listeners.add(callback);
-      return () => listeners.delete(callback);
+      channel.listeners.add(callback);
+      return () => channel.listeners.delete(callback);
     },
     ready(): Promise<StorageStatus> {
       return store.ready
@@ -391,6 +553,11 @@ export function defineModel<T extends { id: string }>(
         : Promise.resolve({ backend: 'memory', persistent: false });
     },
   };
+}
+
+export function resetStorage(): void {
+  resetModelRegistry();
+  resetStorageState();
 }
 
 export { defineModule } from './legacy.js';
