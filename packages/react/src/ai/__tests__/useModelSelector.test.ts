@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { AIState, ModelInfo } from '@nearstack-dev/ai';
+import type { AI, AIState, ModelInfo } from '@nearstack-dev/ai';
 import { useModelSelector } from '../useModelSelector';
 
 const baseState: AIState = {
@@ -28,7 +28,7 @@ interface MockAI {
   state: AIState;
   download: ReturnType<typeof vi.fn>;
   use: ReturnType<typeof vi.fn>;
-  ai: any;
+  ai: AI;
 }
 
 function makeMockAI(models: ModelInfo[]): MockAI {
