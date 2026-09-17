@@ -149,6 +149,33 @@ const { data: notes } = useLiveQuery(
 );
 ```
 
+In Svelte, the async bindings expose the same lifecycle explicitly. The
+returned store has `{ data, loading, error }` state, and `set()` resolves only
+after the model write has completed:
+
+```svelte
+<script lang="ts">
+  import { liveQuery, modelStore } from '@nearstack-dev/svelte';
+
+  const notes = liveQuery(() => NoteModel.table().getAll(), NoteModel);
+  const selected = modelStore(NoteModel, noteId);
+</script>
+
+{#if $notes.loading}
+  <p>Loading…</p>
+{:else if $notes.error}
+  <p>{$notes.error.message}</p>
+{:else}
+  {#each $notes.data ?? [] as note}
+    <p>{note.title}</p>
+  {/each}
+{/if}
+```
+
+Async refreshes are lifecycle-managed, stale results cannot overwrite newer
+ones, and failed reads or writes remain visible through `error` until the
+next successful refresh.
+
 ## Multiple models
 
 You can define as many models as your application needs:
