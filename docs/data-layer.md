@@ -46,9 +46,9 @@ The string passed to `defineModel` is the IndexedDB store name. Use it consisten
 
 ```typescript
 interface Model<T> {
-  name: string;                              // Store name
-  store: Store<T>;                           // Low-level store access
-  table(): Table<T>;                         // High-level query interface
+  name: string; // Store name
+  store: Store<T>; // Low-level store access
+  table(): Table<T>; // High-level query interface
   subscribe(callback: () => void): () => void; // Change notifications
 }
 ```
@@ -87,11 +87,11 @@ const notes = await NoteModel.table().getAll();
 ```typescript
 // Client-side filtering
 const recent = await NoteModel.table().find(
-  note => note.createdAt > Date.now() - 86400000
+  (note) => note.createdAt > Date.now() - 86400000
 );
 
-const tagged = await NoteModel.table().find(
-  note => note.tags.includes('work')
+const tagged = await NoteModel.table().find((note) =>
+  note.tags.includes('work')
 );
 ```
 
@@ -127,7 +127,7 @@ const unsubscribe = NoteModel.subscribe(() => {
 unsubscribe();
 ```
 
-Subscriptions fire after any `insert`, `update`, or `delete` operation. They don't tell you *what* changed—just that something did. This is by design: the subscription triggers a re-query, and the query determines the new state.
+Subscriptions fire after any `insert`, `update`, or `delete` operation. They don't tell you _what_ changed—just that something did. This is by design: the subscription triggers a re-query, and the query determines the new state.
 
 ### Pattern: reactive UI
 
@@ -145,7 +145,7 @@ In React, `useLiveQuery` handles this pattern automatically:
 const { data: notes } = useLiveQuery(
   () => NoteModel.table().getAll(),
   [],
-  NoteModel, // Pass model to auto-subscribe
+  NoteModel // Pass model to auto-subscribe
 );
 ```
 
@@ -180,12 +180,14 @@ interface Project {
 
 // Fetch notes for a project
 const projectNotes = await NoteModel.table().find(
-  note => note.projectId === project.id
+  (note) => note.projectId === project.id
 );
 
 // Fetch a note's project
 const note = await NoteModel.table().get(noteId);
-const project = note ? await ProjectModel.table().get(note.projectId) : undefined;
+const project = note
+  ? await ProjectModel.table().get(note.projectId)
+  : undefined;
 ```
 
 ## Storage details
@@ -195,11 +197,13 @@ const project = note ? await ProjectModel.table().get(note.projectId) : undefine
 Data is stored in the browser's IndexedDB under database name `'nearstack'`. Each model creates an object store with key path `'id'`.
 
 IndexedDB data persists across:
+
 - Page refreshes
 - Browser restarts
 - System reboots
 
 It does **not** persist across:
+
 - Clearing browser data
 - Incognito/private browsing sessions
 - Different browsers or devices
@@ -235,7 +239,7 @@ const status = await NoteModel.ready();
 Non-persistent storage is **opt-in**. Pass `storage: 'memory'` for a
 deliberately ephemeral store (tests, previews), or `storage: 'auto'` to prefer
 IndexedDB and degrade to memory when it is permanently unavailable. `'auto'`
-does *not* degrade on transient failures such as `'UPGRADE_BLOCKED'` — those
+does _not_ degrade on transient failures such as `'UPGRADE_BLOCKED'` — those
 are surfaced and retried, so a momentarily blocked upgrade can never strand a
 model on an empty in-memory store:
 
@@ -277,11 +281,80 @@ and everything recovers automatically once the other tab closes.
 ### Storage limits
 
 IndexedDB storage limits vary by browser:
+
 - **Chrome**: Up to 80% of available disk space
 - **Firefox**: Up to 50% of available disk space (max 2 GB)
 - **Safari**: Up to 1 GB, with prompts for more
 
 For typical local-first applications (notes, todos, contacts), you won't hit these limits.
+
+### Schema migrations
+
+Model schema versions are separate from IndexedDB's structural database version.
+Existing records without metadata are treated as schema version `1`. Set the
+application schema version and provide one synchronous step for each version
+boundary:
+
+```typescript
+interface VersionedNote {
+  id: string;
+  title: string;
+  content?: string;
+  body?: string;
+  archived?: boolean;
+}
+
+const Notes = defineModel<VersionedNote>('notes', {
+  schemaVersion: 3,
+  migrations: [
+    {
+      from: 1,
+      to: 2,
+      migrate: (note) => ({ ...note, body: note.body ?? note.content ?? '' }),
+    },
+    {
+      from: 2,
+      to: 3,
+      migrate: (note) => ({ ...note, archived: false }),
+    },
+  ],
+});
+
+await Notes.ready();
+```
+
+Nearstack applies all missing steps, including when a device skips a release.
+Each model's records and its version metadata are committed in one IndexedDB
+transaction. A thrown migration aborts the transaction and leaves the previous
+records and version available for a later retry. Migration callbacks must be
+synchronous: network requests and `async` callbacks are rejected. Record IDs
+are preserved even if a callback returns a different ID.
+
+Defining the same database/model more than once is supported when the resolved
+storage mode, target schema version, and migration definitions agree. A
+configuration conflict throws `StorageError` with code
+`CONFIGURATION_CONFLICT`; it is not silently resolved by whichever definition
+runs first. Opening data newer than the application understands throws
+`SCHEMA_VERSION_UNSUPPORTED`, and a missing version step throws
+`MIGRATION_FAILED`.
+
+### Persistence and quota reporting
+
+IndexedDB is a persistent backend, but the browser may still evict it. Request
+the separate browser protection when appropriate, usually from a user action:
+
+```typescript
+import { requestPersistence } from '@nearstack-dev/core';
+
+const result = await requestPersistence();
+// { state: 'granted' | 'denied' | 'unsupported' }
+```
+
+`StorageStatus.persistent` describes the selected backend, not an eviction
+guarantee. A write that exceeds the browser quota rejects with a
+`StorageError` whose code is `QUOTA_EXCEEDED`; its original error is available
+as `reason`. A denied persistence request never switches a model to memory or
+erases existing data.
 
 ## Patterns
 
@@ -303,10 +376,11 @@ function autoSave(noteId: string, updates: Partial<Note>) {
 ```typescript
 function searchNotes(query: string, notes: Note[]): Note[] {
   const q = query.toLowerCase();
-  return notes.filter(note =>
-    note.title.toLowerCase().includes(q) ||
-    note.content.toLowerCase().includes(q) ||
-    note.tags.some(tag => tag.toLowerCase().includes(q))
+  return notes.filter(
+    (note) =>
+      note.title.toLowerCase().includes(q) ||
+      note.content.toLowerCase().includes(q) ||
+      note.tags.some((tag) => tag.toLowerCase().includes(q))
   );
 }
 ```
@@ -317,7 +391,9 @@ function searchNotes(query: string, notes: Note[]): Note[] {
 // Export
 async function exportData() {
   const notes = await NoteModel.table().getAll();
-  const blob = new Blob([JSON.stringify(notes, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify(notes, null, 2)], {
+    type: 'application/json',
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
