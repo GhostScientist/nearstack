@@ -1,6 +1,6 @@
 {
   "name": "@nearstack-dev/cli",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "nearstack CLI that can scaffold a blank app",
   "type": "module",
   "main": "dist/index.js",
@@ -16,9 +16,9 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node ../../scripts/clean-dist.mjs dist && tsc",
     "dev": "tsc --watch",
-    "test": "vitest run",
+    "test": "vitest run src",
     "prepublishOnly": "pnpm build"
   },
   "author": "Dakota Kim",
@@ -28,9 +28,9 @@
     "prompts": "^2.4.2"
   },
   "devDependencies": {
-    "@types/node": "^20.11.19",
+    "@types/node": "^22.0.0",
     "@types/prompts": "^2.4.9",
-    "typescript": "^5.3.3",
+    "typescript": "^6.0.3",
     "vitest": "^5.0.0"
   }
 }

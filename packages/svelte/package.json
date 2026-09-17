@@ -1,6 +1,6 @@
 {
   "name": "@nearstack-dev/svelte",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Svelte store adapter (simple bridge)",
   "type": "module",
   "main": "dist/index.js",
@@ -12,22 +12,22 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node ../../scripts/clean-dist.mjs dist && tsc",
     "dev": "tsc --watch",
-    "test": "vitest run",
+    "test": "vitest run src",
     "prepublishOnly": "pnpm build"
   },
   "author": "Dakota Kim",
   "license": "MIT",
   "peerDependencies": {
-    "svelte": "^4.0.0"
+    "svelte": "^5.0.0"
   },
   "dependencies": {
     "@nearstack-dev/core": "workspace:*"
   },
   "devDependencies": {
-    "svelte": "^4.2.10",
-    "typescript": "^5.3.3",
+    "svelte": "^5.57.0",
+    "typescript": "^6.0.3",
     "vitest": "^5.0.0"
   }
 }
