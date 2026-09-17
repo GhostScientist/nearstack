@@ -6,7 +6,12 @@ import { blue, cyan, green, red, yellow } from 'kolorist';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-type Framework = 'react' | 'sveltekit' | 'vue' | 'angular';
+export type Framework = 'react' | 'sveltekit' | 'vue' | 'angular';
+
+export interface ScaffoldOptions {
+  /** Select a template without opening the interactive prompt. */
+  framework?: Framework;
+}
 
 interface PromptResult {
   framework: Framework;
@@ -150,7 +155,10 @@ export const FRAMEWORK_CHOICES: Array<{ title: string; value: Framework }> = [
   { title: 'Angular', value: 'angular' },
 ];
 
-export async function scaffold(projectName: string): Promise<void> {
+export async function scaffold(
+  projectName: string,
+  options: ScaffoldOptions = {}
+): Promise<void> {
   const { targetDir, packageName } = resolveTarget(projectName);
   const templateRoot = path.join(__dirname, '..', 'templates');
 
@@ -174,15 +182,17 @@ export async function scaffold(projectName: string): Promise<void> {
     emptyDir(targetDir);
   }
 
-  const answers: PromptResult = await prompts([
-    {
-      type: 'select',
-      name: 'framework',
-      message: 'Select a UI framework:',
-      choices: FRAMEWORK_CHOICES,
-      initial: 0,
-    },
-  ]);
+  const answers: PromptResult = options.framework
+    ? { framework: options.framework }
+    : await prompts([
+        {
+          type: 'select',
+          name: 'framework',
+          message: 'Select a UI framework:',
+          choices: FRAMEWORK_CHOICES,
+          initial: 0,
+        },
+      ]);
 
   const framework = answers.framework;
 
