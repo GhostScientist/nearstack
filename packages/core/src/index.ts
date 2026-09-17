@@ -10,13 +10,11 @@ import {
   invalidateConnection,
   migrateModel,
   registerStoreName,
-  requestPersistence,
   normalizeStorageError,
   resetStorage as resetStorageState,
 } from './storage.js';
 import type {
   MigrationDefinition,
-  SchemaMigration,
   StorageMode,
   StorageStatus,
 } from './storage.js';
@@ -95,7 +93,7 @@ interface ModelChannel {
   notify(): void;
 }
 
-interface ModelRegistration<T extends { id: string }> {
+interface ModelRegistration {
   database: string;
   mode: Exclude<StorageMode, 'memory'>;
   schemaVersion: number;
@@ -103,7 +101,7 @@ interface ModelRegistration<T extends { id: string }> {
   channel: ModelChannel;
 }
 
-const modelRegistrations = new Map<string, ModelRegistration<{ id: string }>>();
+const modelRegistrations = new Map<string, ModelRegistration>();
 
 function schemaSignature<T extends { id: string }>(
   migrations: MigrationDefinition<T>
@@ -135,16 +133,14 @@ function compatibleStorageModes(
 function getModelChannel<T extends { id: string }>(
   name: string,
   registration: Omit<
-    ModelRegistration<T>,
+    ModelRegistration,
     'channel' | 'migrationsSignature'
   > & {
     migrations: MigrationDefinition<T>;
   }
 ): ModelChannel {
   const key = `${registration.database}\u0000${name}`;
-  const existing = modelRegistrations.get(key) as
-    | ModelRegistration<T>
-    | undefined;
+  const existing = modelRegistrations.get(key);
   const signature = schemaSignature(registration.migrations);
 
   if (existing) {

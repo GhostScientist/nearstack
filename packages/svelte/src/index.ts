@@ -29,7 +29,7 @@ function createAsyncStore<T>(
     loading: false,
     error: null,
   };
-  let subscribers = new Set<(value: AsyncState<T>) => void>();
+  const subscribers = new Set<(value: AsyncState<T>) => void>();
   let stopDependencies: Unsubscribe[] = [];
   let requestId = 0;
 
