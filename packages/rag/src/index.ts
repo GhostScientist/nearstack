@@ -3,7 +3,7 @@
 export interface TextChunk {
   id: string;
   text: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Embedding {
@@ -167,9 +167,10 @@ export class RAGEngine {
       }
 
       // Boost score based on chunk metadata if available
-      if (chunk.metadata?.wordCount) {
+      const wordCount = chunk.metadata?.wordCount;
+      if (typeof wordCount === 'number' && wordCount > 0) {
         // Prefer shorter, more focused chunks for better relevance
-        const lengthPenalty = Math.min(chunk.metadata.wordCount / 100, 0.5);
+        const lengthPenalty = Math.min(wordCount / 100, 0.5);
         score = score * (1 - lengthPenalty);
       }
 

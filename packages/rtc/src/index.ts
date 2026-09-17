@@ -7,13 +7,13 @@ export interface SyncPeer {
 
 export interface CRDTDocument {
   id: string;
-  data: any;
+  data: unknown;
   version: number;
 }
 
 export interface SyncEvent {
   type: string;
-  data: any;
+  data: unknown;
 }
 
 export interface SyncEngineConfig {
@@ -43,13 +43,13 @@ export class SyncEngine {
     this.connected = false;
   }
 
-  async broadcast(type: string, data: any): Promise<void> {
+  async broadcast(type: string, data: unknown): Promise<void> {
     // Stub: Will implement broadcast logic
     console.log(`Broadcasting ${type}:`, data);
 
     // Simulate receiving own message for demo
     setTimeout(() => {
-      this.config.onSync({ type, data: `Remote: ${data}` });
+      this.config.onSync({ type, data: `Remote: ${String(data)}` });
     }, 1000);
   }
 

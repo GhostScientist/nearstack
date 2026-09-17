@@ -14,16 +14,24 @@ Or using the `init` alias:
 npx @nearstack-dev/cli init <project-name>
 ```
 
+The project name is a non-empty relative child path such as
+`apps/my-notes`. The final directory name becomes the npm package name, so
+nested destinations remain valid package names. Absolute paths, `.`/`..`
+segments, the current directory, existing paths that resolve through a
+symlink outside the working directory, and malformed package names are
+rejected before prompting or deleting anything. Overwrite prompts show the
+resolved absolute target, and cancelling leaves the target untouched.
+
 ## Framework selection
 
 The CLI prompts you to choose a framework:
 
-| Framework | Build Tool | Key Features |
-|-----------|-----------|--------------|
-| **React** | Vite | React 19, hooks for data + AI, react-markdown |
-| **Vue** | Vite | Vue 3 Composition API, multi-component SFC |
-| **Angular** | Angular CLI | Angular 18, standalone components, FormsModule |
-| **SvelteKit** | Vite | Svelte 4, SvelteKit routing, reactive stores |
+| Framework     | Build Tool  | Key Features                                   |
+| ------------- | ----------- | ---------------------------------------------- |
+| **React**     | Vite        | React 19, hooks for data + AI, react-markdown  |
+| **Vue**       | Vite        | Vue 3 Composition API, multi-component SFC     |
+| **Angular**   | Angular CLI | Angular 18, standalone components, FormsModule |
+| **SvelteKit** | Vite        | Svelte 5, SvelteKit routing, reactive stores   |
 
 All templates generate the same application—a personal notes app—adapted to each framework's conventions.
 
@@ -132,7 +140,7 @@ my-app/
 └── package.json
 ```
 
-Uses SvelteKit's file-based routing with Svelte 4 reactive syntax.
+Uses SvelteKit's file-based routing with Svelte 5 reactive syntax.
 
 ## Template customization
 

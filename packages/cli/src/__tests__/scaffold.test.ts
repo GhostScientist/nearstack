@@ -11,7 +11,12 @@ vi.mock('prompts', () => ({
   default: promptsMock,
 }));
 
-import { FRAMEWORK_CHOICES, scaffold } from '../index';
+import {
+  FRAMEWORK_CHOICES,
+  ScaffoldError,
+  resolveTarget,
+  scaffold,
+} from '../index';
 
 describe('scaffold', () => {
   const originalCwd = process.cwd();
@@ -35,6 +40,54 @@ describe('scaffold', () => {
       'vue',
       'angular',
     ]);
+  });
+
+  it.each(['../outside', '.', '/tmp/nearstack-absolute'])(
+    'rejects unsafe target %s before prompting',
+    async (projectName) => {
+      await expect(scaffold(projectName)).rejects.toBeInstanceOf(ScaffoldError);
+      expect(promptsMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects a symlink target that resolves outside cwd', async () => {
+    const outsideDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'nearstack-outside-')
+    );
+    const sentinel = path.join(outsideDir, 'sentinel.txt');
+    fs.writeFileSync(sentinel, 'keep me');
+    fs.symlinkSync(outsideDir, path.join(tempDir, 'linked'), 'dir');
+
+    await expect(scaffold('linked/new-app')).rejects.toThrow(/outside/i);
+    expect(fs.readFileSync(sentinel, 'utf-8')).toBe('keep me');
+    fs.rmSync(outsideDir, { recursive: true, force: true });
+  });
+
+  it('uses the final directory name for nested package names', async () => {
+    promptsMock.mockResolvedValueOnce({ framework: 'react' });
+
+    await scaffold('apps/my-app');
+
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(tempDir, 'apps/my-app/package.json'), 'utf-8')
+    );
+    expect(packageJson.name).toBe('my-app');
+  });
+
+  it('leaves an existing target untouched when overwrite is cancelled', async () => {
+    const target = path.join(tempDir, 'existing-app');
+    fs.mkdirSync(target);
+    const sentinel = path.join(target, 'sentinel.txt');
+    fs.writeFileSync(sentinel, 'keep me');
+    promptsMock.mockResolvedValueOnce({ overwrite: false });
+
+    await expect(scaffold('existing-app')).rejects.toThrow(/cancelled/i);
+    expect(fs.readFileSync(sentinel, 'utf-8')).toBe('keep me');
+  });
+
+  it('rejects malformed package names without touching the filesystem', async () => {
+    expect(() => resolveTarget('apps/Bad Name')).toThrow(/package name/i);
+    expect(promptsMock).not.toHaveBeenCalled();
   });
 
   for (const framework of ['react', 'sveltekit', 'vue', 'angular'] as const) {

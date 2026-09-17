@@ -9,12 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@nearstack-dev/core": "^0.1.0",
-    "@nearstack-dev/react": "^0.1.0",
+    "@nearstack-dev/core": "^0.2.0",
+    "@nearstack-dev/react": "^0.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^9.0.0",
-    "@nearstack-dev/ai": "^0.1.0",
+    "@nearstack-dev/ai": "^0.2.0",
     "@mlc-ai/web-llm": "^0.2.80"
   },
   "devDependencies": {

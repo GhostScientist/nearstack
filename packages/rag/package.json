@@ -1,6 +1,6 @@
 {
   "name": "@nearstack-dev/rag",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Text splitter + embedding + vector search (stub)",
   "type": "module",
   "main": "dist/index.js",
@@ -12,7 +12,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node ../../scripts/clean-dist.mjs dist && tsc",
     "dev": "tsc --watch",
     "test": "echo \"No tests yet\"",
     "prepublishOnly": "pnpm build"
@@ -23,6 +23,6 @@
     "@nearstack-dev/core": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^6.0.3"
   }
 }

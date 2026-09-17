@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The project did not previously include a changelog; the entries below summarize the latest changes from February 11, 2026 through February 16, 2026.
 
+## [0.2.0] - Pending release
+
+This coordinated breaking baseline is implemented in the release branch but is
+not published. It includes shared model notifications, ordered atomic schema
+migrations, persistence/quota reporting, safer CLI targets, typed Svelte async
+stores, tightened public types, and aligned package/template metadata. See the
+release workflow and `pnpm release:dry-run`; no npm publication is claimed here.
+
 ## [Unreleased]
 
 ### Breaking

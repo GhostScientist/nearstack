@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { useChat } from '../useChat';
+import type { AI } from '@nearstack-dev/ai';
 
 async function* streamChunks() {
   yield { content: 'Hello' };
@@ -11,7 +12,7 @@ describe('useChat', () => {
   it('streams assistant responses into message history', async () => {
     const mockAI = {
       stream: () => streamChunks(),
-    } as any;
+    } as unknown as AI;
 
     const { result } = renderHook(() => useChat(mockAI));
 

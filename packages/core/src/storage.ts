@@ -17,7 +17,11 @@ export type StorageMode = StorageBackend | 'auto';
 export type StorageErrorCode =
   | 'STORAGE_UNAVAILABLE'
   | 'UPGRADE_BLOCKED'
-  | 'OPEN_FAILED';
+  | 'OPEN_FAILED'
+  | 'QUOTA_EXCEEDED'
+  | 'MIGRATION_FAILED'
+  | 'SCHEMA_VERSION_UNSUPPORTED'
+  | 'CONFIGURATION_CONFLICT';
 
 export class StorageError extends Error {
   readonly code: StorageErrorCode;
@@ -39,6 +43,23 @@ export interface StorageStatus {
   /** Why the store is degraded, when `persistent` is `false`. */
   reason?: string;
 }
+
+export type PersistenceState = 'granted' | 'denied' | 'unsupported';
+
+export interface PersistenceStatus {
+  state: PersistenceState;
+}
+
+export interface SchemaMigration<T extends { id: string }> {
+  from: number;
+  to: number;
+  migrate: (record: T) => T;
+}
+
+export type MigrationDefinition<T extends { id: string }> =
+  readonly SchemaMigration<T>[] | Readonly<Record<number, (record: T) => T>>;
+
+export const SCHEMA_METADATA_STORE = '__nearstack_schema';
 
 export interface StorageConfig {
   /** Default {@link StorageMode} for `defineModel()` calls. */
@@ -82,6 +103,182 @@ export function getIndexedDBFactory(): IDBFactory | undefined {
   }
 }
 
+export function normalizeStorageError(
+  error: unknown,
+  fallbackCode: StorageErrorCode,
+  message: string
+): StorageError {
+  if (error instanceof StorageError) return error;
+  const name = (error as { name?: unknown } | null)?.name;
+  if (name === 'QuotaExceededError') {
+    return new StorageError(
+      'QUOTA_EXCEEDED',
+      'The browser storage quota was exceeded while writing data.',
+      error
+    );
+  }
+  return new StorageError(fallbackCode, message, error);
+}
+
+/** Ask the browser to protect this origin's storage from eviction. */
+export async function requestPersistence(): Promise<PersistenceStatus> {
+  const storage = (globalThis as { navigator?: Navigator }).navigator?.storage;
+  if (!storage?.persist) return { state: 'unsupported' };
+
+  try {
+    return { state: (await storage.persist()) ? 'granted' : 'denied' };
+  } catch {
+    return { state: 'denied' };
+  }
+}
+
+export interface ModelSchemaOptions<T extends { id: string }> {
+  schemaVersion: number;
+  migrations: MigrationDefinition<T>;
+}
+
+interface SchemaMetadata {
+  id: string;
+  version: number;
+}
+
+function migrationSteps<T extends { id: string }>(
+  definition: MigrationDefinition<T>
+): SchemaMigration<T>[] {
+  if (Array.isArray(definition)) return [...definition];
+  return Object.entries(definition).map(([from, migrate]) => ({
+    from: Number(from),
+    to: Number(from) + 1,
+    migrate,
+  }));
+}
+
+/** Migrate one model and its metadata in one readwrite transaction. */
+export function migrateModel<T extends { id: string }>(
+  db: IDBDatabase,
+  modelName: string,
+  options: ModelSchemaOptions<T>
+): Promise<void> {
+  const { schemaVersion, migrations } = options;
+  if (!Number.isInteger(schemaVersion) || schemaVersion < 1) {
+    return Promise.reject(
+      new StorageError(
+        'MIGRATION_FAILED',
+        `Schema version for model "${modelName}" must be a positive integer.`
+      )
+    );
+  }
+
+  const steps = migrationSteps(migrations);
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const fail = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(
+        normalizeStorageError(
+          error,
+          'MIGRATION_FAILED',
+          `Failed to migrate model "${modelName}".`
+        )
+      );
+    };
+
+    let transaction: IDBTransaction;
+    try {
+      transaction = db.transaction(
+        [modelName, SCHEMA_METADATA_STORE],
+        'readwrite'
+      );
+    } catch (error) {
+      fail(error);
+      return;
+    }
+
+    const metadataStore = transaction.objectStore(SCHEMA_METADATA_STORE);
+    const modelStore = transaction.objectStore(modelName);
+    const metadataRequest = metadataStore.get(modelName);
+
+    metadataRequest.onerror = () => fail(metadataRequest.error);
+    metadataRequest.onsuccess = () => {
+      if (settled) return;
+      const metadata = metadataRequest.result as SchemaMetadata | undefined;
+      const currentVersion = metadata?.version ?? 1;
+
+      if (currentVersion > schemaVersion) {
+        fail(
+          new StorageError(
+            'SCHEMA_VERSION_UNSUPPORTED',
+            `Model "${modelName}" uses schema version ${currentVersion}, ` +
+              `but this application supports up to ${schemaVersion}.`
+          )
+        );
+        transaction.abort();
+        return;
+      }
+
+      const recordsRequest = modelStore.getAll();
+      recordsRequest.onerror = () => fail(recordsRequest.error);
+      recordsRequest.onsuccess = () => {
+        if (settled) return;
+        try {
+          let records = recordsRequest.result as T[];
+          let version = currentVersion;
+
+          while (version < schemaVersion) {
+            const step = steps.find(
+              (candidate) =>
+                candidate.from === version && candidate.to === version + 1
+            );
+            if (!step) {
+              throw new StorageError(
+                'MIGRATION_FAILED',
+                `Missing migration for model "${modelName}" from ` +
+                  `schema ${version} to ${version + 1}.`
+              );
+            }
+            records = records.map((record) => {
+              const migrated = step.migrate(record);
+              if (
+                migrated === null ||
+                typeof migrated !== 'object' ||
+                typeof (migrated as { then?: unknown }).then === 'function'
+              ) {
+                throw new StorageError(
+                  'MIGRATION_FAILED',
+                  `Migration ${version} -> ${version + 1} for model ` +
+                    `"${modelName}" must return a record synchronously.`
+                );
+              }
+              return { ...migrated, id: record.id } as T;
+            });
+            version += 1;
+          }
+
+          for (const record of records) modelStore.put(record);
+          metadataStore.put({ id: modelName, version: schemaVersion });
+        } catch (error) {
+          fail(error);
+          transaction.abort();
+        }
+      };
+    };
+
+    transaction.oncomplete = () => {
+      if (!settled) {
+        settled = true;
+        resolve();
+      }
+    };
+    transaction.onabort = () => {
+      fail(transaction.error ?? new Error('Migration transaction aborted.'));
+    };
+    transaction.onerror = () => {
+      if (transaction.error) fail(transaction.error);
+    };
+  });
+}
+
 // ─── Shared DB connection manager ──────────────────────────────────
 // Tracks every registered store name per database and shares a single
 // connection, upgrading the schema when new stores are discovered.
@@ -103,6 +300,9 @@ export function registerStoreName(dbName: string, storeName: string): void {
   }
   if (stores.has(storeName)) return;
   stores.add(storeName);
+  if (storeName !== SCHEMA_METADATA_STORE) {
+    stores.add(SCHEMA_METADATA_STORE);
+  }
   // A new store means the schema is stale: drop the cached connection and
   // close the handles we own so the upgrade transaction can start.
   invalidateConnection(dbName);

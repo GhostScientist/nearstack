@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AI, createAI } from '../ai';
-import { AIErrorCode } from '../errors';
+import { AIError, AIErrorCode } from '../errors';
 import type {
   Provider,
   BrowserProviderInterface,
@@ -174,7 +174,9 @@ describe('AI', () => {
       ai.subscribe(listener);
 
       // Trigger a state change by initializing
-      const initPromise = (ai as any).initialize();
+      const initPromise = (
+        ai as unknown as { initialize(): Promise<void> }
+      ).initialize();
       await initPromise;
 
       expect(listener).toHaveBeenCalled();
@@ -255,7 +257,11 @@ describe('AI', () => {
       await ai.ready();
 
       // Manually clear active model
-      (ai as any).stateManager.setActiveModel(null);
+      (
+        ai as unknown as {
+          stateManager: { setActiveModel(model: string | null): void };
+        }
+      ).stateManager.setActiveModel(null);
 
       await expect(ai.chat('Hello')).rejects.toMatchObject({
         code: AIErrorCode.MODEL_NOT_FOUND,
@@ -445,7 +451,11 @@ describe('AI', () => {
         });
 
         await ai.ready();
-        (ai as any).stateManager.setActiveModel(null);
+        (
+          ai as unknown as {
+            stateManager: { setActiveModel(model: string | null): void };
+          }
+        ).stateManager.setActiveModel(null);
 
         expect(ai.models.active()).toBe(null);
       });
@@ -554,6 +564,183 @@ describe('AI', () => {
       const choices = ai.ui.getModelChoices();
       expect(choices).toHaveLength(2);
       expect(choices[0].value).toBe('model-1');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('uses a configured default model', async () => {
+      const ai = new AI({
+        providers: [mockProvider],
+        defaultModel: 'model-2',
+        autoInitialize: true,
+      });
+
+      await ai.ready();
+      expect(ai.getState().activeModel).toBe('model-2');
+      expect(ai.getState().activeProvider).toBe('mock');
+    });
+
+    it('rejects browser-only operations for missing or non-browser models', async () => {
+      const ai = new AI({
+        providers: [mockProvider],
+        autoInitialize: true,
+      });
+
+      await ai.ready();
+      await expect(ai.models.download('missing')).rejects.toMatchObject({
+        code: AIErrorCode.MODEL_NOT_FOUND,
+      });
+      await expect(ai.models.delete('model-1')).rejects.toMatchObject({
+        code: AIErrorCode.PROVIDER_NOT_AVAILABLE,
+      });
+      await expect(ai.models.download('model-1')).rejects.toMatchObject({
+        code: AIErrorCode.PROVIDER_NOT_AVAILABLE,
+      });
+      await expect(
+        ai.chat('hello', { model: 'missing' })
+      ).rejects.toMatchObject({
+        code: AIErrorCode.MODEL_NOT_FOUND,
+      });
+    });
+
+    it('reports a missing provider for a known model', async () => {
+      const ai = new AI({ providers: [mockProvider], autoInitialize: true });
+      await ai.ready();
+      (
+        ai as unknown as { providerInstances: Map<string, Provider> }
+      ).providerInstances.clear();
+
+      await expect(
+        ai.chat('hello', { model: 'model-1' })
+      ).rejects.toMatchObject({
+        code: AIErrorCode.PROVIDER_NOT_AVAILABLE,
+      });
+    });
+
+    it('deletes a cached browser model and clears it when active', async () => {
+      const { provider } = createMockBrowserProvider('browser', [
+        createMockModel('browser-model', 'browser', { state: 'cached' }),
+      ]);
+      const ai = new AI({ providers: [provider], autoInitialize: true });
+
+      await ai.ready();
+      await ai.models.use('browser-model');
+      await ai.models.delete('browser-model');
+
+      expect(provider.deleteModel).toHaveBeenCalledWith('browser-model');
+      expect(ai.models.get('browser-model')?.status.state).toBe('available');
+      expect(ai.getState().activeModel).toBeNull();
+    });
+
+    it('refreshes unavailable and failing providers without rejecting the batch', async () => {
+      const unavailable = createMockProvider('unavailable');
+      unavailable.isAvailable = vi.fn().mockResolvedValue(false);
+      const failing = createMockProvider('failing');
+      failing.isAvailable = vi.fn().mockRejectedValue(new Error('offline'));
+      const ai = new AI({
+        providers: [unavailable, failing],
+        autoInitialize: true,
+      });
+
+      await ai.ready();
+      await expect(ai.providers.refresh()).resolves.toBeUndefined();
+      expect(ai.providers.list()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'unavailable', available: false }),
+          expect.objectContaining({
+            id: 'failing',
+            available: false,
+            error: 'offline',
+          }),
+        ])
+      );
+    });
+
+    it('returns null when cancelling without an active download', () => {
+      const ai = new AI({ autoInitialize: false });
+      expect(() => ai.models.cancelDownload()).not.toThrow();
+    });
+
+    it('auto-selects a ready Ollama model', async () => {
+      const ollama = createMockProvider('ollama', 'ollama', true, [
+        createMockModel('ollama-model', 'ollama'),
+      ]);
+      const ai = new AI({ providers: [ollama], autoInitialize: true });
+
+      await ai.ready();
+      expect(ai.getState().activeModel).toBe('ollama-model');
+    });
+
+    it('records provider initialization failures', async () => {
+      const failing = createMockProvider('failing');
+      failing.initialize = vi.fn().mockRejectedValue(new Error('init failed'));
+      const ai = new AI({ providers: [failing], autoInitialize: true });
+
+      await ai.ready();
+      expect(ai.providers.list()).toEqual([
+        expect.objectContaining({
+          id: 'failing',
+          available: false,
+          error: 'init failed',
+        }),
+      ]);
+    });
+
+    it('reports download progress and handles cancellation', async () => {
+      const { provider } = createMockBrowserProvider('browser', [
+        createMockModel('browser-model', 'browser', { state: 'available' }),
+      ]);
+      const download = vi.fn(
+        async (_modelId: string, onProgress: (progress: number) => void) => {
+          onProgress(0.5);
+          throw new AIError(AIErrorCode.DOWNLOAD_CANCELLED, 'cancelled');
+        }
+      );
+      provider.downloadModel = download;
+      const ai = new AI({ providers: [provider], autoInitialize: true });
+
+      await ai.ready();
+      await expect(ai.models.download('browser-model')).rejects.toMatchObject({
+        code: AIErrorCode.DOWNLOAD_CANCELLED,
+      });
+      expect(ai.models.get('browser-model')?.status.state).toBe('available');
+    });
+
+    it('cancels an active browser download and clears its state', async () => {
+      const { provider, pendingDownloads } = createMockBrowserProvider(
+        'browser',
+        [createMockModel('browser-model', 'browser', { state: 'available' })]
+      );
+      const ai = new AI({ providers: [provider], autoInitialize: true });
+
+      await ai.ready();
+      const pending = ai.models.download('browser-model');
+      (
+        ai as unknown as {
+          stateManager: { setDownloading(modelId: string | null): void };
+        }
+      ).stateManager.setDownloading('browser-model');
+      ai.models.cancelDownload();
+      pendingDownloads[0].reject(
+        new AIError(AIErrorCode.DOWNLOAD_CANCELLED, 'cancelled')
+      );
+      await expect(pending).rejects.toBeDefined();
+      expect(provider.cancelDownload).toHaveBeenCalled();
+    });
+
+    it('replaces duplicate providers and removes missing providers safely', async () => {
+      const ai = new AI({
+        providers: [mockProvider],
+        autoInitialize: true,
+        debug: true,
+      });
+      await ai.ready();
+      const replacement = createMockProvider('mock');
+      ai.providers.add(replacement);
+      ai.providers.remove('missing');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(mockProvider.dispose).toHaveBeenCalled();
+      expect(replacement.initialize).toHaveBeenCalled();
     });
   });
 

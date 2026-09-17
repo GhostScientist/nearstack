@@ -1,22 +1,25 @@
 {
   "name": "nearstack",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Nearstack is a local-first full-stack web framework that makes the browser the backend. Built for offline-first AI apps.",
   "author": "Dakota Kim",
   "license": "MIT",
   "packageManager": "pnpm@10.33.0",
   "engines": {
-    "node": ">=20.19.0",
+    "node": ">=22.14.0",
     "pnpm": ">=10"
   },
   "scripts": {
     "build": "pnpm --filter \"./packages/*\" run build",
     "dev": "pnpm --filter \"./packages/*\" run dev --parallel",
     "test": "pnpm --filter \"./packages/*\" run test",
-    "lint": "eslint packages/*/src --ext .ts,.tsx",
+    "test:scaffolds": "node scripts/scaffold-smoke.mjs",
+    "lint": "eslint packages/*/src",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,json}\"",
-    "publish:all": "pnpm --filter \"./packages/*\" publish --access public",
+    "release:check": "node scripts/release-check.mjs",
+    "release:dry-run": "node scripts/release-dry-run.mjs",
+    "publish:all": "pnpm --filter \"./packages/*\" publish --access public --provenance",
     "publish:core": "pnpm --filter @nearstack-dev/core publish",
     "publish:react": "pnpm --filter @nearstack-dev/react publish",
     "publish:svelte": "pnpm --filter @nearstack-dev/svelte publish",
@@ -26,10 +29,11 @@
     "publish:cli": "pnpm --filter @nearstack-dev/cli publish"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@typescript-eslint/eslint-plugin": "^8.69.0",
     "@typescript-eslint/parser": "^8.69.0",
-    "eslint": "^8.56.0",
+    "eslint": "^10.10.0",
     "prettier": "^3.9.6",
-    "typescript": "^5.3.3"
+    "typescript": "^6.0.3"
   }
 }

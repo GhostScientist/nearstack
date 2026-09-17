@@ -1,6 +1,6 @@
 {
   "name": "@nearstack-dev/ai",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Browser-native local AI inference library with WebLLM and Ollama support",
   "type": "module",
   "main": "dist/index.cjs",
@@ -25,7 +25,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc --emitDeclarationOnly && node ../../scripts/copy-cjs-types.mjs dist/index.d.ts dist/index.d.cts",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -47,9 +47,9 @@
   "devDependencies": {
     "@mlc-ai/web-llm": "^0.2.80",
     "@vitest/coverage-v8": "^5.0.0",
-    "fake-indexeddb": "^5.0.0",
+    "fake-indexeddb": "^6.2.5",
     "tsup": "^8.0.0",
-    "typescript": "^5.3.3",
+    "typescript": "^6.0.3",
     "vitest": "^5.0.0"
   },
   "keywords": [

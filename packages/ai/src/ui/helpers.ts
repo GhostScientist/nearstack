@@ -90,12 +90,7 @@ export function createUIHelpers(getState: () => AIState) {
    */
   function getStatusLabel(
     state:
-      | 'available'
-      | 'downloading'
-      | 'cached'
-      | 'loading'
-      | 'ready'
-      | 'error'
+      'available' | 'downloading' | 'cached' | 'loading' | 'ready' | 'error'
   ): string {
     return getModelStatusLabel(state);
   }

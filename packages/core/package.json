@@ -1,6 +1,6 @@
 {
   "name": "@nearstack-dev/core",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "IndexedDB runtime, defineModel(), base Store interface",
   "type": "module",
   "main": "dist/index.js",
@@ -12,16 +12,18 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node ../../scripts/clean-dist.mjs dist && tsc",
     "dev": "tsc --watch",
-    "test": "vitest run",
+    "test": "vitest run src",
+    "test:coverage": "vitest run src --coverage",
     "prepublishOnly": "pnpm build"
   },
   "author": "Dakota Kim",
   "license": "MIT",
   "devDependencies": {
+    "@vitest/coverage-v8": "^5.0.0",
     "fake-indexeddb": "^6.0.0",
-    "typescript": "^5.3.3",
+    "typescript": "^6.0.3",
     "vitest": "^5.0.0"
   }
 }

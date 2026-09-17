@@ -4,7 +4,7 @@ This guide walks you through creating your first Nearstack application.
 
 ## Prerequisites
 
-- **Node.js 18+** — [Download](https://nodejs.org)
+- **Node.js 22.14+** — [Download](https://nodejs.org)
 - **npm, pnpm, or yarn** — Any package manager works
 
 For browser AI (optional):
@@ -27,7 +27,7 @@ The CLI will prompt you to choose a framework:
 - **React** (Vite) — React 19 with hooks for data and AI
 - **Vue** (Vite) — Vue 3 with Composition API
 - **Angular** — Angular 18 with standalone components
-- **SvelteKit** — SvelteKit with Svelte 4
+- **SvelteKit** — SvelteKit with Svelte 5
 
 All templates scaffold the same application—a personal notes app with AI integration—adapted to each framework's patterns and conventions.
 

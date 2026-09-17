@@ -89,8 +89,7 @@ export class AIError extends Error {
       captureStackTrace?: (
         target: object,
         constructor?:
-          | ((...args: never[]) => unknown)
-          | (new (...args: never[]) => unknown)
+          ((...args: never[]) => unknown) | (new (...args: never[]) => unknown)
       ) => void;
     };
     if (typeof ErrorWithCapture.captureStackTrace === 'function') {
