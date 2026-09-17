@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { Model } from '@nearstack-dev/core';
 
-export function useModel<T = any>(model: Model<T>, id: string) {
+export function useModel<T extends { id: string }>(
+  model: Model<T>,
+  id: string
+) {
   const [data, setData] = useState<T | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);

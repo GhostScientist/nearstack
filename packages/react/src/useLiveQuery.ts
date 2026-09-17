@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
-import type { Model } from '@nearstack-dev/core';
+import type { Unsubscribe } from '@nearstack-dev/core';
 
-export function useLiveQuery<T = any>(
+interface ModelSubscription {
+  subscribe(callback: () => void): Unsubscribe;
+}
+
+export function useLiveQuery<T>(
   query: () => Promise<T>,
-  deps: any[] = [],
-  model?: Model<any>
+  deps: readonly unknown[] = [],
+  model?: ModelSubscription
 ) {
   const [data, setData] = useState<T | undefined>(undefined);
   const [loading, setLoading] = useState(true);
