@@ -13,14 +13,6 @@ interface Note {
   body?: string;
 }
 
-function openDatabase(name: string): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(name);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
 async function createLegacyDatabase(name: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const request = indexedDB.open(name, 1);
