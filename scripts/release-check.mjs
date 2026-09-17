@@ -6,9 +6,30 @@ const rootDir = path.resolve(new URL('..', import.meta.url).pathname);
 const root = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
 const packageNames = ['ai', 'cli', 'core', 'rag', 'react', 'rtc', 'svelte'];
 const failures = [];
+const publicRegistry = 'https://registry.npmjs.org/';
 
 if (!/^0\.2\.\d+$/.test(root.version)) {
   failures.push(`root version must be a coordinated 0.2.x version (got ${root.version})`);
+}
+
+const npmrcPath = path.join(rootDir, '.npmrc');
+if (
+  !fs.existsSync(npmrcPath) ||
+  fs.readFileSync(npmrcPath, 'utf8').trim() !== `registry=${publicRegistry}`
+) {
+  failures.push(`.npmrc must pin the public npm registry (${publicRegistry})`);
+}
+
+for (const lockfile of [
+  'pnpm-lock.yaml',
+  ...packageNames.map((name) => path.join('packages', name, 'package-lock.json')),
+]) {
+  const lockfilePath = path.join(rootDir, lockfile);
+  if (!fs.existsSync(lockfilePath)) continue;
+  const contents = fs.readFileSync(lockfilePath, 'utf8');
+  if (/demoulas|jfrog/i.test(contents)) {
+    failures.push(`${lockfile} contains a private registry URL`);
+  }
 }
 
 for (const name of packageNames) {
