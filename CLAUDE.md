@@ -37,7 +37,7 @@ Publishing: `pnpm publish:all` or `pnpm publish:<package>` from the root (each p
 | `packages/core` | `defineModel()` → IndexedDB stores with reactive subscriptions | `tsc` (ESM only) | vitest + `fake-indexeddb` |
 | `packages/ai` | `AI` class + `ai` singleton; WebLLM/Ollama providers | `tsup` (dual ESM/CJS) | vitest, node env, `fake-indexeddb/auto` setup, coverage thresholds |
 | `packages/react` | `useModel`, `useLiveQuery` (root export); `useAI`, `useChat`, `useModelSelector`, `ModelSelector` (`./ai` subpath export) | `tsup` (dual ESM/CJS, entries `src/index.ts` + `src/ai.ts`) | vitest, jsdom env |
-| `packages/svelte` | Basic store bridges (`modelStore`, `liveQuery`) | `tsc` | none |
+| `packages/svelte` | Reactive async stores (`modelStore`, `liveQuery`) | `tsc` | vitest |
 | `packages/cli` | `nearstack create <name>` scaffolder; templates in `packages/cli/templates/{react,vue,angular,sveltekit,svelte}` | `tsc` (tests excluded from compile) | vitest, node env |
 | `packages/rag` | Text splitter / vector search — stub | `tsc` | none |
 | `packages/rtc` | WebRTC + CRDT sync — stub | `tsc` | none |
@@ -48,7 +48,7 @@ Packages built with plain `tsc` are ESM (`"type": "module"`) and must use explic
 
 ### Data layer (`core`)
 
-`defineModel<T>(name, options?)` creates a `Model` backed by an `IndexedDBStore` in a single shared database named `nearstack` (one object store per model, keyPath `id`, ids from `crypto.randomUUID()`). A module-level connection manager (`src/storage.ts`) tracks registered store names and reopens the DB with a bumped version whenever a new store is missing. `defineModel()` may be called lazily (code-split routes, dynamic imports): registering a new store closes the connections nearstack owns, open handles close on `versionchange`, and a genuinely blocked upgrade rejects with `StorageError('UPGRADE_BLOCKED')` rather than hanging. Storage is detected from `globalThis.indexedDB`, so Workers and Service Workers are supported. When IndexedDB is unavailable, the default `storage: 'indexeddb'` mode **rejects** every operation with a `StorageError` — silent in-memory fallback is opt-in via `storage: 'memory'`/`'auto'` or `configureStorage({ mode })`, and `model.ready()` reports the resolved `StorageStatus`.
+`defineModel<T>(name, options?)` creates a `Model` backed by an `IndexedDBStore` in a single shared database named `nearstack` (one object store per model, keyPath `id`, ids from `crypto.randomUUID()`). A module-level connection manager (`src/storage.ts`) tracks registered store names and reopens the DB with a bumped version whenever a new store is missing. Model registrations share one notification channel per database/name and reject incompatible storage/schema definitions. Per-model schema metadata and synchronous ordered migrations are committed atomically with records. `defineModel()` may be called lazily (code-split routes, dynamic imports): registering a new store closes the connections nearstack owns, open handles close on `versionchange`, and a genuinely blocked upgrade rejects with `StorageError('UPGRADE_BLOCKED')` rather than hanging. Storage is detected from `globalThis.indexedDB`, so Workers and Service Workers are supported. When IndexedDB is unavailable, the default `storage: 'indexeddb'` mode **rejects** every operation with a `StorageError` — silent in-memory fallback is opt-in via `storage: 'memory'`/`'auto'` or `configureStorage({ mode })`, and `model.ready()` reports the resolved `StorageStatus`.
 
 Reactivity is coarse-grained: every write (`set`/`delete`, and thus `insert`/`update`) fires all `subscribe()` listeners for that model with no payload; consumers re-run their queries. `Table.find()` is a full-scan `getAll().filter()` — there are no indexes. `defineModule` in `core/src/legacy.ts` is a legacy export; don't build on it.
 
@@ -64,13 +64,13 @@ React is the first-class binding: `useLiveQuery(queryFn, deps, model)` re-runs t
 
 ### CLI and templates
 
-`nearstack create <name>` prompts for a framework (choices in `FRAMEWORK_CHOICES`, `src/index.ts`), copies `templates/<framework>` into the target dir, and substitutes `{{PROJECT_NAME}}` in `package.json`, `index.html`, `public/manifest.json`, `vite.config.ts`, and `angular.json` where present. Templates are shipped in the published package (`files: ["dist", "templates"]`) and reference **published** `@nearstack-dev/*` versions (e.g. `^0.1.0`), not `workspace:*` — bumping package APIs may require updating template code and version ranges.
+`nearstack create <name>` prompts for a framework (choices in `FRAMEWORK_CHOICES`, `src/index.ts`), copies one of the four active templates (`react`, `vue`, `angular`, `sveltekit`) into the target dir, and substitutes `{{PROJECT_NAME}}` literally in `package.json`, `index.html`, `public/manifest.json`, `vite.config.ts`, and `angular.json` where present. Templates are shipped in the published package (`files: ["dist", "templates"]`) and reference **published** `@nearstack-dev/*` `^0.2.0` versions, not `workspace:*` — bumping package APIs may require updating template code and version ranges. Targets must be relative child paths whose resolved destination remains inside the caller's directory; CLI errors are caught at the async boundary and return a nonzero status.
 
 Each template scaffolds the same notes app (IndexedDB persistence, search, tags, AI chat) with Vite + Tailwind. When changing template behavior (e.g. AI system prompts, chat wiring), keep the four active templates (react, vue, angular, sveltekit) consistent — the CHANGELOG shows this is an explicit convention. The CLI scaffold tests (`packages/cli/src/__tests__/scaffold.test.ts`) assert on template contents, so template edits can require test updates.
 
 ## Conventions
 
-- TypeScript strict mode, ES2020 target; each package extends `tsconfig.base.json`.
+- Node 22.14+ is the supported runtime, with pnpm 10.33.0 recorded in `packageManager`. TypeScript strict mode, ES2020 target; each package extends `tsconfig.base.json`.
 - Prettier: single quotes, semicolons, 80-column width, 2-space tabs. ESLint: `eslint:recommended` + `@typescript-eslint/recommended` with no custom rules.
 - Cross-package dependencies inside the workspace use `workspace:*`; framework libs (`react`, `svelte`, `@mlc-ai/web-llm`) are peer dependencies of the packages that use them.
 - Tests live in `__tests__/` directories next to the code (`src/**/*.test.ts`).

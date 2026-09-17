@@ -1,5 +1,8 @@
 # Nearstack
 
+> Coordinated `0.2.0` baseline — pending release. The release workflow has not
+> published this version yet.
+
 **The browser is the backend.**
 
 Nearstack is a local-first web framework that makes it possible to build full-stack applications entirely in the browser. No servers. No accounts. No API keys. Just open your app and everything works.
@@ -195,7 +198,7 @@ The generated app is a personal notes application that shows what's possible whe
 | Ollama integration with auto-detection | `ai` | Stable |
 | Streaming chat and model management | `ai` | Stable |
 | React hooks (`useLiveQuery`, `useChat`, `useModelSelector`) | `react` | Stable |
-| Svelte store adapters | `svelte` | Basic |
+| Reactive Svelte async stores | `svelte` | Stable |
 | CLI scaffolder with 4 framework templates | `cli` | Stable |
 
 ### In development
