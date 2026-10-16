@@ -6,13 +6,20 @@ The project did not previously include a changelog; the entries below summarize 
 
 ## [0.2.0] - Pending release
 
-This coordinated breaking baseline is implemented in the release branch but is
+This coordinated breaking baseline is implemented on `main` but is
 not published. It includes shared model notifications, ordered atomic schema
 migrations, persistence/quota reporting, safer CLI targets, typed Svelte async
 stores, tightened public types, and aligned package/template metadata. See the
 release workflow and `pnpm release:dry-run`; no npm publication is claimed here.
 
 ## [Unreleased]
+
+### Maintenance
+
+- Refresh compatible workspace dependencies and GitHub Actions; explicitly pair React and React DOM in development and Dependabot updates.
+- Correct React CommonJS declaration exports and validate release metadata and packed entrypoints in CI.
+- Require the full build, coverage, lint, packaging, and scaffold checks before publishing; repeat CI and the workspace dependency audit weekly.
+- Add Dependabot coverage for the four template manifests and document outstanding PR, branch, and release work in [the maintenance guide](docs/maintenance.md).
 
 ### Breaking
 
