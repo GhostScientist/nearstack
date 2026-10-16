@@ -1,2 +1,7 @@
 packages:
   - 'packages/*'
+
+# tsup 8 still selects esbuild 0.27, which has GHSA-g7r4-m6w7-qqqr.
+# Remove once tsup supports a patched esbuild on our minimum Node version.
+overrides:
+  'tsup@8>esbuild': '^0.28.2'

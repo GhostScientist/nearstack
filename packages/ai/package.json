@@ -35,7 +35,6 @@
   },
   "author": "Dakota Kim",
   "license": "MIT",
-  "dependencies": {},
   "peerDependencies": {
     "@mlc-ai/web-llm": ">=0.2.0"
   },
@@ -45,12 +44,12 @@
     }
   },
   "devDependencies": {
-    "@mlc-ai/web-llm": "^0.2.80",
-    "@vitest/coverage-v8": "^5.0.0",
+    "@mlc-ai/web-llm": "^0.2.86",
+    "@vitest/coverage-v8": "^5.0.5",
     "fake-indexeddb": "^6.2.5",
-    "tsup": "^8.0.0",
+    "tsup": "^8.5.1",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.5"
   },
   "keywords": [
     "ai",

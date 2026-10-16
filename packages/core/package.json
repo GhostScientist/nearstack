@@ -21,9 +21,9 @@
   "author": "Dakota Kim",
   "license": "MIT",
   "devDependencies": {
-    "@vitest/coverage-v8": "^5.0.0",
-    "fake-indexeddb": "^6.0.0",
+    "@vitest/coverage-v8": "^5.0.5",
+    "fake-indexeddb": "^6.2.5",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.5"
   }
 }
