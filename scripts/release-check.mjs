@@ -1,15 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
-const rootDir = path.resolve(new URL('..', import.meta.url).pathname);
-const root = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+const rootDir = fileURLToPath(new URL('..', import.meta.url));
+const root = JSON.parse(
+  fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8')
+);
 const packageNames = ['ai', 'cli', 'core', 'rag', 'react', 'rtc', 'svelte'];
 const failures = [];
 const publicRegistry = 'https://registry.npmjs.org/';
 
 if (!/^0\.2\.\d+$/.test(root.version)) {
-  failures.push(`root version must be a coordinated 0.2.x version (got ${root.version})`);
+  failures.push(
+    `root version must be a coordinated 0.2.x version (got ${root.version})`
+  );
 }
 
 const npmrcPath = path.join(rootDir, '.npmrc');
@@ -22,7 +27,9 @@ if (
 
 for (const lockfile of [
   'pnpm-lock.yaml',
-  ...packageNames.map((name) => path.join('packages', name, 'package-lock.json')),
+  ...packageNames.map((name) =>
+    path.join('packages', name, 'package-lock.json')
+  ),
 ]) {
   const lockfilePath = path.join(rootDir, lockfile);
   if (!fs.existsSync(lockfilePath)) continue;
@@ -36,7 +43,20 @@ for (const name of packageNames) {
   const packagePath = path.join(rootDir, 'packages', name, 'package.json');
   const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
   if (packageJson.version !== root.version) {
-    failures.push(`${packageJson.name} is ${packageJson.version}; expected ${root.version}`);
+    failures.push(
+      `${packageJson.name} is ${packageJson.version}; expected ${root.version}`
+    );
+  }
+  for (const [entry, conditions] of Object.entries(packageJson.exports ?? {})) {
+    if (
+      packageJson.type === 'module' &&
+      conditions.require?.default?.endsWith('.cjs') &&
+      !conditions.require?.types?.endsWith('.d.cts')
+    ) {
+      failures.push(
+        `${packageJson.name} ${entry} must expose CommonJS declarations as .d.cts`
+      );
+    }
   }
 }
 
@@ -50,17 +70,24 @@ for (const entry of fs.readdirSync(templatesDir, { withFileTypes: true })) {
     '@nearstack-dev/ai': packageJson.dependencies?.['@nearstack-dev/ai'],
     '@nearstack-dev/core': packageJson.dependencies?.['@nearstack-dev/core'],
     '@nearstack-dev/react': packageJson.dependencies?.['@nearstack-dev/react'],
-    '@nearstack-dev/svelte': packageJson.dependencies?.['@nearstack-dev/svelte'],
+    '@nearstack-dev/svelte':
+      packageJson.dependencies?.['@nearstack-dev/svelte'],
   })) {
     if (version !== undefined && version !== `^${root.version}`) {
-      failures.push(`${entry.name} declares ${dependency} as ${version}; expected ^${root.version}`);
+      failures.push(
+        `${entry.name} declares ${dependency} as ${version}; expected ^${root.version}`
+      );
     }
   }
 }
 
-const react = JSON.parse(fs.readFileSync(path.join(rootDir, 'packages/react/package.json'), 'utf8'));
+const react = JSON.parse(
+  fs.readFileSync(path.join(rootDir, 'packages/react/package.json'), 'utf8')
+);
 if (react.peerDependencies?.['@nearstack-dev/ai'] !== `^${root.version}`) {
-  failures.push('react AI peer range is not aligned with the coordinated version');
+  failures.push(
+    'react AI peer range is not aligned with the coordinated version'
+  );
 }
 
 if (failures.length > 0) {
