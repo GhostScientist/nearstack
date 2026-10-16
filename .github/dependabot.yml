@@ -8,7 +8,21 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    # Types must describe the minimum supported runtime, not a newer Node API.
+    ignore:
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     groups:
+      # React's renderer requires exactly the same runtime version as React.
+      react:
+        patterns:
+          - 'react'
+          - 'react-dom'
+          - '@types/react'
+          - '@types/react-dom'
+        update-types:
+          - minor
+          - patch
       # These ship as a matched set. Upgrading the plugin without the parser
       # (or vice versa) breaks the lint run, so a split PR arrives red for
       # reasons that have nothing to do with the change in it.
@@ -31,9 +45,32 @@ updates:
           - minor
           - patch
         exclude-patterns:
+          - 'react'
+          - 'react-dom'
+          - '@types/react'
+          - '@types/react-dom'
           - '@typescript-eslint/*'
           - 'vitest'
           - '@vitest/*'
+
+  # Templates are shipped as source and have independent manifests. The root
+  # pnpm workspace does not include them, so they need their own update entry.
+  - package-ecosystem: npm
+    directories:
+      - /packages/cli/templates/react
+      - /packages/cli/templates/vue
+      - /packages/cli/templates/sveltekit
+      - /packages/cli/templates/angular
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    ignore:
+      # These ranges follow our coordinated release, not registry updates.
+      - dependency-name: '@nearstack-dev/*'
+    groups:
+      template-maintenance:
+        patterns: ['*']
+        update-types: [minor, patch]
 
   - package-ecosystem: github-actions
     directory: /
