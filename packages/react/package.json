@@ -35,7 +35,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup && tsc --emitDeclarationOnly && node ../../scripts/copy-cjs-types.mjs dist/index.d.ts dist/index.d.cts dist/ai.d.ts dist/ai.d.cts",
+    "build": "tsup && node ../../scripts/fix-cjs-core-types.mjs dist/index.d.cts",
     "dev": "tsup --watch",
     "test": "vitest run",
     "prepublishOnly": "pnpm build"

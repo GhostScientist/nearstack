@@ -1,9 +1,11 @@
 import { defineConfig } from 'tsup';
 
-export default defineConfig({
+export default defineConfig(({ watch }) => ({
   entry: ['src/index.ts'],
   format: ['esm', 'cjs'],
-  dts: false,
+  // tsup 8 sets baseUrl internally; keep the TS 6 compatibility setting
+  // scoped to declaration bundling until tsup removes that deprecated option.
+  dts: watch ? false : { compilerOptions: { ignoreDeprecations: '6.0' } },
   splitting: false,
   sourcemap: true,
   clean: true,
@@ -15,4 +17,4 @@ export default defineConfig({
       js: '// @nearstack-dev/ai - Browser-native local AI inference',
     };
   },
-});
+}));

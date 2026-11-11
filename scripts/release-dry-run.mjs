@@ -35,6 +35,8 @@ try {
       `Expected ${packageNames.length} package archives, found ${artifacts.length}.`
     );
   }
+  const consumerDir = path.join(destination, 'consumer');
+  const modulesDir = path.join(consumerDir, 'node_modules');
   for (const artifact of artifacts) {
     const archivePath = path.join(destination, artifact);
     const files = new Set(
@@ -84,7 +86,72 @@ try {
     ) {
       throw new Error(`${manifest.name}: archive contains compiled tests`);
     }
+    // Test the published files, without workspace links masking missing files.
+    const packageDir = path.join(modulesDir, manifest.name);
+    fs.mkdirSync(packageDir, { recursive: true });
+    execFileSync('tar', [
+      '-xzf',
+      archivePath,
+      '-C',
+      packageDir,
+      '--strip-components=1',
+    ]);
   }
+
+  // React's external types come from the frozen workspace install. Nearstack
+  // itself resolves exclusively from the archives extracted above.
+  fs.mkdirSync(path.join(modulesDir, '@types'), { recursive: true });
+  fs.symlinkSync(
+    fs.realpathSync(
+      path.join(rootDir, 'packages/react/node_modules/@types/react')
+    ),
+    path.join(modulesDir, '@types/react'),
+    'dir'
+  );
+  const consumer = `
+import { useModel, useLiveQuery } from '@nearstack-dev/react';
+import { useAI, useChat, useModelSelector, ModelSelector } from '@nearstack-dev/react/ai';
+import { AI, createAI } from '@nearstack-dev/ai';
+import type { Model } from '@nearstack-dev/core' with { 'resolution-mode': 'import' };
+
+export function usePackedPackages(model: Model<{ id: string; title: string }>) {
+  const instance: AI = createAI();
+  const note = useModel(model, 'note');
+  const title: string | undefined = note.data?.title;
+  return {
+    title,
+    query: useLiveQuery(() => model.table().getAll(), [], model),
+    state: useAI(instance),
+    chat: useChat(instance),
+    models: useModelSelector(instance),
+    selector: ModelSelector,
+  };
+}
+`;
+  for (const extension of ['mts', 'cts']) {
+    fs.writeFileSync(path.join(consumerDir, `consumer.${extension}`), consumer);
+  }
+  const configPath = path.join(consumerDir, 'tsconfig.json');
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify({
+      compilerOptions: {
+        target: 'ES2020',
+        module: 'Node16',
+        moduleResolution: 'Node16',
+        strict: true,
+        skipLibCheck: false,
+        noEmit: true,
+        types: [],
+      },
+      files: ['consumer.mts', 'consumer.cts'],
+    })
+  );
+  execFileSync('pnpm', ['exec', 'tsc', '--project', configPath], {
+    cwd: rootDir,
+    stdio: 'inherit',
+  });
+  console.log('Packed ESM and CommonJS TypeScript consumers passed.');
   console.log(
     `Dry run validated ${artifacts.length} ${root.version} package archives.`
   );
