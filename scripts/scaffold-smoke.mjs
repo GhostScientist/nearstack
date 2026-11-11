@@ -3,9 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { execFileSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const rootDir = path.resolve(new URL('..', import.meta.url).pathname);
+const rootDir = fileURLToPath(new URL('..', import.meta.url));
 const packageNames = ['ai', 'cli', 'core', 'rag', 'react', 'rtc', 'svelte'];
 
 execFileSync('pnpm', ['build'], { cwd: rootDir, stdio: 'inherit' });

@@ -5,24 +5,31 @@ interface NoteEditorProps {
   note: Note;
 }
 
+type NoteDraft = Partial<Pick<Note, 'title' | 'content'>>;
+
 export function NoteEditor({ note }: NoteEditorProps) {
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [tagInput, setTagInput] = useState('');
-  const saveTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined
+  const pendingSaves = useRef(
+    new Map<string, { draft: NoteDraft; timeout: ReturnType<typeof setTimeout> }>()
   );
 
   useEffect(() => {
-    setTitle(note.title);
-    setContent(note.content);
+    const draft = pendingSaves.current.get(note.id)?.draft;
+    setTitle(draft?.title ?? note.title);
+    setContent(draft?.content ?? note.content);
   }, [note.id, note.title, note.content]);
 
-  const save = (updates: Partial<Note>) => {
-    clearTimeout(saveTimeout.current);
-    saveTimeout.current = setTimeout(() => {
-      void NoteModel.table().update(note.id, { ...updates, updatedAt: Date.now() });
+  const save = (updates: NoteDraft) => {
+    const pending = pendingSaves.current.get(note.id);
+    clearTimeout(pending?.timeout);
+    const draft = { ...pending?.draft, ...updates };
+    const timeout = setTimeout(() => {
+      pendingSaves.current.delete(note.id);
+      void NoteModel.table().update(note.id, { ...draft, updatedAt: Date.now() });
     }, 300);
+    pendingSaves.current.set(note.id, { draft, timeout });
   };
 
   const handleTitleChange = (value: string) => {
@@ -56,6 +63,8 @@ export function NoteEditor({ note }: NoteEditorProps) {
   };
 
   const deleteNote = () => {
+    clearTimeout(pendingSaves.current.get(note.id)?.timeout);
+    pendingSaves.current.delete(note.id);
     void NoteModel.table().delete(note.id);
   };
 

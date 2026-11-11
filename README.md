@@ -232,6 +232,7 @@ These are the areas where the original vision extends beyond what's currently im
 - [React Guide](docs/react.md) — Hooks, components, and patterns for React apps
 - [CLI Reference](docs/cli.md) — Scaffolding commands and template options
 - [Full-Stack Client-Side Patterns](docs/full-stack-client-side.md) — Architecture guide for building complete apps in the browser
+- [Maintenance and Release Baseline](docs/maintenance.md) — PR and branch triage, recurring checks, and release steps
 
 ## Workspace commands
 

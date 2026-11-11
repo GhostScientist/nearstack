@@ -28,7 +28,7 @@ pnpm --filter @nearstack-dev/ai exec vitest run -t "detects ollama"             
 
 The `ai` package also has `test:watch`, `test:coverage` (80% thresholds enforced on statements/branches/functions/lines), and `typecheck` scripts.
 
-Publishing: `pnpm publish:all` or `pnpm publish:<package>` from the root (each package builds via `prepublishOnly`).
+Publishing: use the CI Release workflow after validation. See [the maintenance and release guide](docs/maintenance.md) for triggers, dry runs, and recovery; the root publish scripts are used by that workflow.
 
 ## Package layout and build tooling
 
